@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
 
 from sqlalchemy.exc import IntegrityError
@@ -32,6 +34,48 @@ class ProjectRepository:
         if decision:
             statement = statement.join(Evaluation).where(Evaluation.decision == decision)
         return list(self.session.exec(statement).all())
+
+    def update(self, project: Project) -> Project:
+        self.session.add(project)
+        self.session.commit()
+        self.session.refresh(project)
+        return project
+
+    def list_with_options(
+        self,
+        *,
+        pool: str | None = None,
+        source: str | None = None,
+        filter_status: str | None = None,
+        decision: str | None = None,
+        tag: str | None = None,
+        order_by: str = "first_seen_at",
+        order_desc: bool = True,
+    ) -> list[Project]:
+        statement = select(Project)
+        if pool:
+            statement = statement.where(Project.pool == pool)
+        if source:
+            statement = statement.where(Project.source == source)
+        if filter_status:
+            statement = statement.where(Project.filter_status == filter_status)
+        if decision:
+            statement = statement.join(Evaluation).where(Evaluation.decision == decision)
+        order_col = getattr(Project, order_by, Project.first_seen_at)
+        statement = statement.order_by(order_col.desc() if order_desc else order_col.asc())
+        results = list(self.session.exec(statement).all())
+        # Tag filtering done in-memory for SQLite JSON compatibility
+        if tag:
+            results = [p for p in results if p.tags and tag in p.tags]
+        return results
+
+    def get_all_tags(self) -> list[str]:
+        projects = self.session.exec(select(Project)).all()
+        tags: set[str] = set()
+        for p in projects:
+            if p.tags:
+                tags.update(p.tags)
+        return sorted(tags)
 
     def upsert(self, project: Project) -> Project:
         existing = self.get_by_repo_full_name(project.repo_full_name)
@@ -69,6 +113,20 @@ class EvaluationRepository:
     def list_by_project(self, project_id: int) -> list[Evaluation]:
         statement = select(Evaluation).where(Evaluation.project_id == project_id)
         return list(self.session.exec(statement).all())
+
+    def get_latest_by_project(self, project_id: int) -> Evaluation | None:
+        statement = (
+            select(Evaluation)
+            .where(Evaluation.project_id == project_id)
+            .order_by(Evaluation.id.desc())
+        )
+        return self.session.exec(statement).first()
+
+    def update(self, evaluation: Evaluation) -> Evaluation:
+        self.session.add(evaluation)
+        self.session.commit()
+        self.session.refresh(evaluation)
+        return evaluation
 
 
 class TrialRepository:
