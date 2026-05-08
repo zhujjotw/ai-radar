@@ -139,6 +139,15 @@ class TrialRepository:
         self.session.refresh(trial)
         return trial
 
+    def get(self, trial_id: int) -> Trial | None:
+        return self.session.get(Trial, trial_id)
+
+    def update(self, trial: Trial) -> Trial:
+        self.session.add(trial)
+        self.session.commit()
+        self.session.refresh(trial)
+        return trial
+
     def update_status(self, trial_id: int, status: str, *, blockers: str | None = None) -> Trial:
         trial = self.session.get(Trial, trial_id)
         if trial is None:
@@ -150,6 +159,21 @@ class TrialRepository:
         self.session.commit()
         self.session.refresh(trial)
         return trial
+
+    def list_by_project(self, project_id: int) -> list[Trial]:
+        statement = select(Trial).where(Trial.project_id == project_id)
+        return list(self.session.exec(statement).all())
+
+    def list_by_status(self, status: str) -> list[Trial]:
+        statement = select(Trial).where(Trial.status == status)
+        return list(self.session.exec(statement).all())
+
+    def list_by_owner(self, owner: str) -> list[Trial]:
+        statement = select(Trial).where(Trial.owner == owner)
+        return list(self.session.exec(statement).all())
+
+    def list_all(self) -> list[Trial]:
+        return list(self.session.exec(select(Trial)).all())
 
 
 class ShareRepository:
