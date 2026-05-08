@@ -1,0 +1,7 @@
+github_min_stars: 200
+github_max_inactive_days: 90
+daily_candidate_limit: 10
+daily_digest_limit: 5
+min_recommendation_score: 3
+allow_manual_override: true
+

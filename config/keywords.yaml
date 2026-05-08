@@ -1,0 +1,38 @@
+Agent:
+  - agent
+  - multi-agent
+  - autonomous-agent
+  - langgraph
+  - crewai
+RAG:
+  - rag
+  - retrieval-augmented-generation
+  - vector-search
+  - embedding
+Eval:
+  - eval
+  - evaluation
+  - benchmark
+  - judge
+  - hallucination
+Inference:
+  - inference
+  - serving
+  - vllm
+  - quantization
+  - gpu
+Workflow:
+  - workflow
+  - orchestration
+  - automation
+  - no-code
+Developer Tooling:
+  - coding-agent
+  - code-assistant
+  - copilot
+  - devtool
+MCP:
+  - mcp
+  - model-context-protocol
+  - mcp-server
+
