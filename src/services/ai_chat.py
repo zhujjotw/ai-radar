@@ -10,7 +10,7 @@ import requests
 
 from src.config import get_settings
 from src.db import get_session, init_db
-from src.repositories import ProjectRepository
+from src.repositories import EvaluationRepository, ProjectRepository, TrialRepository
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,11 @@ def _build_project_context() -> str:
     """Build context from all projects in database."""
     init_db()
     session = get_session()
-    repo = ProjectRepository(session)
-    projects = repo.list_with_options()
+    project_repo = ProjectRepository(session)
+    eval_repo = EvaluationRepository(session)
+    trial_repo = TrialRepository(session)
+
+    projects = project_repo.list_with_options()
 
     if not projects:
         return "暂无项目数据。"
@@ -52,6 +55,29 @@ def _build_project_context() -> str:
             parts.append(f"AI描述: {p.llm_description}")
         if p.llm_scenarios:
             parts.append(f"适用场景: {p.llm_scenarios}")
+
+        # Add evaluation info
+        evaluation = eval_repo.get_latest_by_project(p.id) if p.id else None
+        if evaluation:
+            parts.append(f"评估状态: {evaluation.decision}")
+            if evaluation.recommendation_score:
+                parts.append(f"推荐分: {evaluation.recommendation_score}/5")
+            if evaluation.decision_reason:
+                parts.append(f"决策原因: {evaluation.decision_reason}")
+
+        # Add trial info
+        trials = trial_repo.list_by_project(p.id) if p.id else []
+        if trials:
+            active_trials = [t for t in trials if t.status not in ("dropped",)]
+            if active_trials:
+                parts.append("试用状态:")
+                for t in active_trials:
+                    parts.append(f"  - 负责人: {t.owner}, 状态: {t.status}")
+                    if t.due_date:
+                        parts.append(f"    截止日期: {t.due_date}")
+                    if t.result_summary:
+                        parts.append(f"    结果: {t.result_summary}")
+
         context_parts.append("\n".join(parts))
 
     return "\n\n---\n\n".join(context_parts)

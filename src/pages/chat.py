@@ -47,11 +47,19 @@ if prompt := st.chat_input("询问关于GitHub项目的问题..."):
 with st.sidebar:
     st.header("示例查询")
     st.markdown("""
+    **项目检索：**
     - Agent框架有哪些项目？
     - 推荐一些RAG相关的项目
     - 有哪些LLM评测工具？
     - 向量数据库有哪些选择？
     - 有没有好用的AI代码助手？
+
+    **项目状态：**
+    - 当前有哪些认领项目？
+    - 哪些项目正在试用中？
+    - 有哪些项目已完成demo？
+    - 谁在负责项目试用？
+    - 当前有哪些blocked项目？
     """)
 
     if st.button("清空对话"):
