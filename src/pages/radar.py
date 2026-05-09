@@ -8,12 +8,6 @@ from src.config import get_settings
 from src.db import get_session, init_db
 from src.models import Evaluation, Trial
 from src.repositories import EvaluationRepository, ProjectRepository, TrialRepository
-from src.services.state_machine import (
-    EVAL_DECISION_META,
-    apply_eval_transition,
-    get_allowed_eval_transitions,
-    validate_eval_transition,
-)
 
 # --- Database setup ---
 init_db()
@@ -323,129 +317,32 @@ else:
             # ---- Actions ----
             st.divider()
 
-            action_col1, action_col2, action_col3 = st.columns(3)
-
-            with action_col1:
-                st.markdown("##### 认领项目")
-                if _has_active_trial(project.id):
-                    st.info(f"已由 {owner} 认领")
-                    if st.button("前往 Trials 管理", key=f"goto_trial_{project.id}"):
-                        st.switch_page("pages/trials.py")
-                else:
-                    claim_owner = st.text_input(
-                        "你的名字",
-                        key=f"claim_owner_{project.id}",
-                    )
-                    if st.button("认领", key=f"claim_{project.id}"):
-                        if not claim_owner.strip():
-                            st.warning("请输入你的名字")
-                        else:
-                            if not evaluation or evaluation.decision != "try":
-                                if evaluation:
-                                    evaluation.decision = "try"
-                                    _evaluation_repo.update(evaluation)
-                                else:
-                                    new_eval = Evaluation(project_id=project.id, decision="try")
-                                    _evaluation_repo.create(new_eval)
-                            trial = Trial(
-                                project_id=project.id,
-                                owner=claim_owner.strip(),
-                                status="claimed",
-                            )
-                            _trial_repo.create(trial)
-                            st.success(f"已认领 **{project.name}**")
-                            st.rerun()
-
-            with action_col2:
-                st.markdown("##### 设决策")
-                current_decision = evaluation.decision if evaluation else "needs_review"
-
-                # Get allowed transitions from state machine
-                if current_decision == "needs_review":
-                    # New evaluation - can choose any decision
-                    allowed_decisions = ["watch", "try", "reject"]
-                else:
-                    allowed_transitions = get_allowed_eval_transitions(current_decision)
-                    allowed_decisions = [t.target for t in allowed_transitions]
-
-                if allowed_decisions:
-                    # Build options with labels
-                    decision_options = {}
-                    for d in allowed_decisions:
-                        meta = EVAL_DECISION_META.get(d, {})
-                        label = meta.get("label", d)
-                        emoji = meta.get("emoji", "")
-                        decision_options[d] = f"{emoji} {label}"
-
-                    new_decision = st.selectbox(
-                        "决策",
-                        options=allowed_decisions,
-                        format_func=lambda x: decision_options.get(x, x),
-                        index=allowed_decisions.index(current_decision)
-                        if current_decision in allowed_decisions
-                        else 0,
-                        key=f"decision_{project.id}",
-                    )
-
-                    # Show validation feedback
-                    if evaluation and current_decision != "needs_review":
-                        validation_error = validate_eval_transition(evaluation, new_decision)
-                        if validation_error:
-                            st.warning(f"⚠️ {validation_error}")
-
-                    decision_reason = st.text_input(
-                        "原因",
-                        value=evaluation.decision_reason or "" if evaluation else "",
-                        key=f"reason_{project.id}",
-                    )
-                    if st.button("保存决策", key=f"save_decision_{project.id}"):
-                        try:
-                            if evaluation and current_decision != "needs_review":
-                                # Use state machine for existing evaluations
-                                evaluation.decision_reason = decision_reason or None
-                                apply_eval_transition(evaluation, new_decision)
-                                _evaluation_repo.update(evaluation)
-                            elif evaluation:
-                                # Update existing evaluation from needs_review
-                                evaluation.decision = new_decision
-                                evaluation.decision_reason = decision_reason or None
+            st.markdown("##### 认领项目")
+            if _has_active_trial(project.id):
+                st.info(f"已由 {owner} 认领")
+                if st.button("前往 Trials 管理", key=f"goto_trial_{project.id}"):
+                    st.switch_page("pages/trials.py")
+            else:
+                claim_owner = st.text_input(
+                    "你的名字",
+                    key=f"claim_owner_{project.id}",
+                )
+                if st.button("认领", key=f"claim_{project.id}"):
+                    if not claim_owner.strip():
+                        st.warning("请输入你的名字")
+                    else:
+                        if not evaluation or evaluation.decision != "try":
+                            if evaluation:
+                                evaluation.decision = "try"
                                 _evaluation_repo.update(evaluation)
                             else:
-                                # Create new evaluation
-                                new_eval = Evaluation(
-                                    project_id=project.id,
-                                    decision=new_decision,
-                                    decision_reason=decision_reason or None,
-                                )
+                                new_eval = Evaluation(project_id=project.id, decision="try")
                                 _evaluation_repo.create(new_eval)
-                            st.success(f"决策已设为 **{new_decision}**")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"决策更新失败: {e}")
-                else:
-                    st.info(f"当前决策 **{current_decision}** 不可更改")
-
-            with action_col3:
-                st.markdown("##### 覆盖过滤")
-                if project.filter_status != "override":
-                    override_reason = st.text_input(
-                        "覆盖原因",
-                        key=f"override_reason_{project.id}",
-                    )
-                    if st.button("覆盖过滤", key=f"override_{project.id}"):
-                        if not override_reason:
-                            st.warning("请输入覆盖原因")
-                        else:
-                            project.filter_status = "override"
-                            project.filter_reason = override_reason
-                            _project_repo.update(project)
-                            st.success("已覆盖过滤")
-                            st.rerun()
-                else:
-                    st.info(f"已覆盖: {project.filter_reason or '无原因'}")
-                    if st.button("取消覆盖", key=f"remove_override_{project.id}"):
-                        project.filter_status = "needs_review"
-                        project.filter_reason = None
-                        _project_repo.update(project)
-                        st.success("已取消覆盖")
+                        trial = Trial(
+                            project_id=project.id,
+                            owner=claim_owner.strip(),
+                            status="claimed",
+                        )
+                        _trial_repo.create(trial)
+                        st.success(f"已认领 **{project.name}**")
                         st.rerun()
