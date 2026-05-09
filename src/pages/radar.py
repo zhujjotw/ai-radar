@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import streamlit as st
 
-from src.config import get_settings
 from src.db import get_session, init_db
 from src.models import Evaluation, Trial
 from src.repositories import EvaluationRepository, ProjectRepository, TrialRepository
@@ -74,54 +73,6 @@ sort_options = {
     "未评估优先": ("unevaluated_sort", True),
 }
 sort_label = st.selectbox("排序", options=list(sort_options.keys()), index=0)
-
-st.divider()
-
-# --- Load settings early for sidebar LLM config ---
-_settings = get_settings()
-_llm_configured = bool(_settings.llm_api_key)
-
-# --- Sidebar LLM config ---
-with st.sidebar:
-    st.header("LLM 配置")
-
-    llm_api_key = st.text_input(
-        "API Key",
-        value=_settings.llm_api_key or "",
-        type="password",
-        key="sidebar_llm_api_key",
-    )
-    llm_base_url = st.text_input(
-        "Base URL",
-        value=_settings.llm_base_url,
-        key="sidebar_llm_base_url",
-    )
-    llm_model = st.text_input(
-        "Model",
-        value=_settings.llm_model,
-        key="sidebar_llm_model",
-    )
-    if st.button("保存 LLM 配置", key="save_llm_config"):
-        env_path = _settings.model_config.get("env_file")
-        if env_path:
-            lines = []
-            existing = {}
-            try:
-                with open(env_path, "r", encoding="utf-8") as f:
-                    for line in f:
-                        stripped = line.strip()
-                        if stripped and not stripped.startswith("#") and "=" in stripped:
-                            k, _, v = stripped.partition("=")
-                            existing[k.strip()] = v.strip()
-            except FileNotFoundError:
-                pass
-            existing["LLM_API_KEY"] = llm_api_key.strip()
-            existing["LLM_BASE_URL"] = llm_base_url.strip()
-            existing["LLM_MODEL"] = llm_model.strip()
-            with open(env_path, "w", encoding="utf-8") as f:
-                for k, v in existing.items():
-                    f.write(f"{k}={v}\n")
-            st.success("LLM 配置已保存到 .env，下次启动生效")
 
 st.divider()
 
