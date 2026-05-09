@@ -2,7 +2,6 @@
 
 from sqlmodel import Session, SQLModel, create_engine
 
-from src.db import get_session
 from src.models import GraphEdge, GraphNode, Project, Share, Trial
 from src.services.graph_builder import (
     add_dependency,

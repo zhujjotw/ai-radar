@@ -150,7 +150,7 @@ class TestProjectFilter:
 
     def test_naive_datetime_handled(self):
         """Naive datetime (no tzinfo) should be treated as UTC."""
-        old_date = datetime.utcnow() - timedelta(days=120)
+        old_date = datetime.now(timezone.utc) - timedelta(days=120)
         result = filter_project(stars=500, last_pushed_at=old_date, is_archived=False)
         assert result["filter_status"] == "filtered_out"
 
