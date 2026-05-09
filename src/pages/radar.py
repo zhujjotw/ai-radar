@@ -8,7 +8,12 @@ from src.config import get_settings
 from src.db import get_session, init_db
 from src.models import Evaluation, Trial
 from src.repositories import EvaluationRepository, ProjectRepository, TrialRepository
-from src.services.llm_analyzer import analyze_project
+from src.services.state_machine import (
+    EVAL_DECISION_META,
+    apply_eval_transition,
+    get_allowed_eval_transitions,
+    validate_eval_transition,
+)
 
 # --- Database setup ---
 init_db()
@@ -19,12 +24,13 @@ _trial_repo = TrialRepository(_session)
 
 # --- Status badge colors ---
 _STATUS_STYLE: dict[str, str] = {
-    "watch": "color:#8b949e;",
+    "needs_review": "color:#8b949e;",
+    "watch": "color:#58a6ff;",
     "try": "color:#d29922;",
-    "reject": "color:#f85149;",
     "adopt": "color:#3fb950;",
+    "reject": "color:#f85149;",
     "claimed": "color:#58a6ff;",
-    "running": "color:#58a6ff;",
+    "running": "color:#d29922;",
     "blocked": "color:#f85149;",
     "demo_done": "color:#3fb950;",
     "shared": "color:#a371f7;",
@@ -35,34 +41,35 @@ _STATUS_STYLE: dict[str, str] = {
 st.title("Candidate Pool")
 st.caption("AI 开源项目候选池 — 浏览、评估、认领")
 
-# --- Load settings early for sidebar LLM config ---
-_settings = get_settings()
-_llm_configured = bool(_settings.llm_api_key)
+# --- Filters ---
+st.subheader("筛选")
+filter_cols = st.columns(5)
 
-# --- Sidebar filters ---
-with st.sidebar:
-    st.header("筛选")
-
+with filter_cols[0]:
     pool_filter = st.selectbox(
         "Pool",
         options=["All", "baseline", "candidate"],
         index=0,
     )
+with filter_cols[1]:
     filter_status_filter = st.selectbox(
         "Filter Status",
         options=["All", "needs_review", "passed", "filtered_out", "override"],
         index=0,
     )
+with filter_cols[2]:
     decision_filter = st.selectbox(
         "决策",
         options=["全部决策", "watch", "try", "reject"],
         index=0,
     )
+with filter_cols[3]:
     source_filter = st.selectbox(
         "Source",
         options=["All", "baseline", "github_search", "external", "manual"],
         index=0,
     )
+with filter_cols[4]:
     all_tags = _project_repo.get_all_tags()
     tag_filter = st.selectbox(
         "方向",
@@ -70,18 +77,24 @@ with st.sidebar:
         index=0,
     )
 
-    st.divider()
+# Sort options
+sort_options = {
+    "推荐分优先": ("recommendation_sort", True),
+    "Stars 最多": ("stars", True),
+    "最新发现": ("first_seen_at", True),
+    "最近更新": ("last_pushed_at", True),
+    "未评估优先": ("unevaluated_sort", True),
+}
+sort_label = st.selectbox("排序", options=list(sort_options.keys()), index=0)
 
-    sort_options = {
-        "推荐分优先": ("recommendation_sort", True),
-        "Stars 最多": ("stars", True),
-        "最新发现": ("first_seen_at", True),
-        "最近更新": ("last_pushed_at", True),
-        "未评估优先": ("unevaluated_sort", True),
-    }
-    sort_label = st.selectbox("排序", options=list(sort_options.keys()), index=0)
+st.divider()
 
-    st.divider()
+# --- Load settings early for sidebar LLM config ---
+_settings = get_settings()
+_llm_configured = bool(_settings.llm_api_key)
+
+# --- Sidebar LLM config ---
+with st.sidebar:
     st.header("LLM 配置")
 
     llm_api_key = st.text_input(
@@ -176,7 +189,6 @@ _trial_cache: dict[int, list[Trial]] = {}
 for p in projects:
     if p.id and p.id not in _trial_cache:
         _trial_cache[p.id] = _trial_repo.list_by_project(p.id)
-
 
 
 def _get_owner(project_id: int | None) -> str:
@@ -341,9 +353,7 @@ else:
                                     evaluation.decision = "try"
                                     _evaluation_repo.update(evaluation)
                                 else:
-                                    new_eval = Evaluation(
-                                        project_id=project.id, decision="try"
-                                    )
+                                    new_eval = Evaluation(project_id=project.id, decision="try")
                                     _evaluation_repo.create(new_eval)
                             trial = Trial(
                                 project_id=project.id,
@@ -356,34 +366,72 @@ else:
 
             with action_col2:
                 st.markdown("##### 设决策")
-                current_decision = evaluation.decision if evaluation else "watch"
-                new_decision = st.selectbox(
-                    "决策",
-                    options=["watch", "try", "reject"],
-                    index=["watch", "try", "reject"].index(current_decision)
-                    if current_decision in ("watch", "try", "reject")
-                    else 0,
-                    key=f"decision_{project.id}",
-                )
-                decision_reason = st.text_input(
-                    "原因",
-                    value=evaluation.decision_reason or "" if evaluation else "",
-                    key=f"reason_{project.id}",
-                )
-                if st.button("保存决策", key=f"save_decision_{project.id}"):
-                    if evaluation:
-                        evaluation.decision = new_decision
-                        evaluation.decision_reason = decision_reason or None
-                        _evaluation_repo.update(evaluation)
-                    else:
-                        new_eval = Evaluation(
-                            project_id=project.id,
-                            decision=new_decision,
-                            decision_reason=decision_reason or None,
-                        )
-                        _evaluation_repo.create(new_eval)
-                    st.success(f"决策已设为 **{new_decision}**")
-                    st.rerun()
+                current_decision = evaluation.decision if evaluation else "needs_review"
+
+                # Get allowed transitions from state machine
+                if current_decision == "needs_review":
+                    # New evaluation - can choose any decision
+                    allowed_decisions = ["watch", "try", "reject"]
+                else:
+                    allowed_transitions = get_allowed_eval_transitions(current_decision)
+                    allowed_decisions = [t.target for t in allowed_transitions]
+
+                if allowed_decisions:
+                    # Build options with labels
+                    decision_options = {}
+                    for d in allowed_decisions:
+                        meta = EVAL_DECISION_META.get(d, {})
+                        label = meta.get("label", d)
+                        emoji = meta.get("emoji", "")
+                        decision_options[d] = f"{emoji} {label}"
+
+                    new_decision = st.selectbox(
+                        "决策",
+                        options=allowed_decisions,
+                        format_func=lambda x: decision_options.get(x, x),
+                        index=allowed_decisions.index(current_decision)
+                        if current_decision in allowed_decisions
+                        else 0,
+                        key=f"decision_{project.id}",
+                    )
+
+                    # Show validation feedback
+                    if evaluation and current_decision != "needs_review":
+                        validation_error = validate_eval_transition(evaluation, new_decision)
+                        if validation_error:
+                            st.warning(f"⚠️ {validation_error}")
+
+                    decision_reason = st.text_input(
+                        "原因",
+                        value=evaluation.decision_reason or "" if evaluation else "",
+                        key=f"reason_{project.id}",
+                    )
+                    if st.button("保存决策", key=f"save_decision_{project.id}"):
+                        try:
+                            if evaluation and current_decision != "needs_review":
+                                # Use state machine for existing evaluations
+                                evaluation.decision_reason = decision_reason or None
+                                apply_eval_transition(evaluation, new_decision)
+                                _evaluation_repo.update(evaluation)
+                            elif evaluation:
+                                # Update existing evaluation from needs_review
+                                evaluation.decision = new_decision
+                                evaluation.decision_reason = decision_reason or None
+                                _evaluation_repo.update(evaluation)
+                            else:
+                                # Create new evaluation
+                                new_eval = Evaluation(
+                                    project_id=project.id,
+                                    decision=new_decision,
+                                    decision_reason=decision_reason or None,
+                                )
+                                _evaluation_repo.create(new_eval)
+                            st.success(f"决策已设为 **{new_decision}**")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"决策更新失败: {e}")
+                else:
+                    st.info(f"当前决策 **{current_decision}** 不可更改")
 
             with action_col3:
                 st.markdown("##### 覆盖过滤")
