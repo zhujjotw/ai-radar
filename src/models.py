@@ -36,6 +36,8 @@ class Project(SQLModel, table=True):
     is_archived: bool = False
     filter_status: str = Field(default="needs_review", index=True)
     filter_reason: str | None = None
+    llm_description: str | None = None
+    llm_scenarios: str | None = None
 
 
 class Evaluation(SQLModel, table=True):

@@ -9,6 +9,8 @@ from __future__ import annotations
 import logging
 import re
 import time
+from datetime import datetime, timezone
+
 import requests
 
 from src.config import get_settings, load_yaml_config
@@ -25,8 +27,8 @@ def _build_search_query(keywords: list[str], min_stars: int = 200) -> str:
 
     Combines keywords with OR and adds a minimum-star qualifier.
     """
-    keyword_part = " ".join(f'"{kw}" in:name,description,topics' for kw in keywords)
-    return f"({keyword_part}) stars:>={min_stars} sort:stars"
+    keyword_part = " OR ".join(f"{kw} in:name,description" for kw in keywords)
+    return f"({keyword_part}) stars:>={min_stars}"
 
 
 def _parse_repo_full_name(url: str) -> str:
@@ -57,7 +59,7 @@ def _fetch_search_results(
     pages_needed = (max_results + _PER_PAGE - 1) // _PER_PAGE
 
     while page <= pages_needed:
-        params = {"q": query, "per_page": _PER_PAGE, "page": page}
+        params = {"q": query, "per_page": _PER_PAGE, "page": page, "sort": "stars", "order": "desc"}
         try:
             resp = requests.get(
                 f"{_GITHUB_API}/search/repositories",
@@ -89,6 +91,13 @@ def _fetch_search_results(
     return items[:max_results]
 
 
+def _parse_github_datetime(value: str | None) -> datetime | None:
+    """Parse a GitHub API datetime string (ISO 8601) to a Python datetime."""
+    if not value:
+        return None
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
 def _github_item_to_project(item: dict) -> Project:
     """Convert a GitHub search API item to a ``Project`` model instance."""
     full_name = item["full_name"]
@@ -109,7 +118,7 @@ def _github_item_to_project(item: dict) -> Project:
         license=item.get("license", {}).get("spdx_id") if item.get("license") else None,
         has_quickstart=False,
         readme_summary=None,
-        last_pushed_at=item.get("pushed_at"),
+        last_pushed_at=_parse_github_datetime(item.get("pushed_at")),
         last_checked_at=None,
     )
 
@@ -236,9 +245,7 @@ def refresh_project_metadata(
     project.license = (
         data.get("license", {}).get("spdx_id") if data.get("license") else project.license
     )
-    project.last_pushed_at = data.get("pushed_at", project.last_pushed_at)
-    project.last_checked_at = __import__("datetime").datetime.now(
-        __import__("datetime").timezone.utc
-    )
+    project.last_pushed_at = _parse_github_datetime(data.get("pushed_at")) or project.last_pushed_at
+    project.last_checked_at = datetime.now(tz=timezone.utc)
 
     return project

@@ -26,7 +26,11 @@ def main() -> None:
     daily_limit = filters_config.get("daily_candidate_limit", 10)
 
     logger.info("Searching GitHub for new candidate projects (limit=%d)…", daily_limit)
-    candidates = search_candidate_projects(total_max=daily_limit, enrich_readme=False)
+    candidates = search_candidate_projects(
+        max_results_per_category=10,
+        total_max=daily_limit,
+        enrich_readme=False,
+    )
     logger.info("Found %d candidate(s) from GitHub Search", len(candidates))
 
     inserted = 0

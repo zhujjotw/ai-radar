@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     github_token: str | None = None
     db_path: str = "./data/ai_radar.db"
     port: int = 8501
+    llm_api_key: str | None = None
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_model: str = "gpt-4o-mini"
 
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env",
