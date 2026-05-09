@@ -268,7 +268,6 @@ else:
             # ---- Actions ----
             st.divider()
 
-            st.markdown("##### 认领项目")
             if _has_active_trial(project.id):
                 st.info(f"已由 {owner} 认领")
                 if st.button("前往 Trials 管理", key=f"goto_trial_{project.id}"):
