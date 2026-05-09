@@ -7,7 +7,7 @@ import streamlit as st
 from src.services.ixauth import verify_with_default
 
 # Center the login form
-col1, col2, col3 = st.columns([1, 1, 1])
+col1, col2, col3 = st.columns([3, 2, 3])
 
 with col2:
     st.title("🔐 登录")
