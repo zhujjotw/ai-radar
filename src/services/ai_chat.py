@@ -83,6 +83,29 @@ def _build_project_context() -> str:
     return "\n\n---\n\n".join(context_parts)
 
 
+def _extract_content(resp_data: dict) -> str:
+    """Extract content from LLM response, filtering out thinking/reasoning."""
+    choices = resp_data.get("choices", [])
+    if not choices:
+        return ""
+
+    message = choices[0].get("message", {})
+
+    # Some APIs (like Minimax) return reasoning_content separately
+    # We only want the main content
+    content = message.get("content", "")
+
+    # Filter out thinking blocks if they're embedded in content
+    # Common patterns: <think>...</think>, <reasoning>...</reasoning>
+    import re
+
+    content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
+    content = re.sub(r"<reasoning>.*?</reasoning>", "", content, flags=re.DOTALL)
+    content = content.strip()
+
+    return content
+
+
 def _search_web(query: str) -> str:
     """Search web for GitHub projects related to query."""
     try:
@@ -127,7 +150,7 @@ def _search_web(query: str) -> str:
         if resp.status_code != 200:
             return f"Web搜索失败: HTTP {resp.status_code}"
 
-        content = resp.json()["choices"][0]["message"]["content"].strip()
+        content = _extract_content(resp.json())
 
         # Extract JSON from response
         try:
@@ -222,7 +245,7 @@ def chat_with_ai(query: str) -> ChatResponse:
                 from_graph=False,
             )
 
-        graph_answer = resp.json()["choices"][0]["message"]["content"].strip()
+        graph_answer = _extract_content(resp.json())
 
         # Check if graph had relevant info
         has_graph_info = "没有找到" not in graph_answer and "未找到" not in graph_answer
