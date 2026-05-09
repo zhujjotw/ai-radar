@@ -85,8 +85,8 @@ else:
 
     # Graph configuration
     config = AgraphConfig(
-        width=1000,
-        height=600,
+        width=1400,
+        height=800,
         directed=True,
         physics=True,
         hierarchical=False,
