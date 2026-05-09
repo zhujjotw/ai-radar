@@ -1,0 +1,233 @@
+"""AI Chat service: query knowledge graph and web search."""
+
+from __future__ import annotations
+
+import json
+import logging
+from dataclasses import dataclass
+
+import requests
+
+from src.config import get_settings
+from src.db import get_session, init_db
+from src.repositories import ProjectRepository
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ChatResponse:
+    """Response from AI chat."""
+
+    answer: str
+    sources: list[str]
+    from_graph: bool
+
+
+def _build_project_context() -> str:
+    """Build context from all projects in database."""
+    init_db()
+    session = get_session()
+    repo = ProjectRepository(session)
+    projects = repo.list_with_options()
+
+    if not projects:
+        return "暂无项目数据。"
+
+    context_parts = ["以下是AI Radar知识图谱中的项目信息：\n"]
+
+    for p in projects:
+        parts = [f"## {p.name}"]
+        if p.description:
+            parts.append(f"描述: {p.description}")
+        parts.append(f"GitHub: {p.github_url}")
+        parts.append(f"Stars: {p.stars}")
+        if p.language:
+            parts.append(f"语言: {p.language}")
+        if p.tags:
+            parts.append(f"方向标签: {', '.join(p.tags)}")
+        if p.topics:
+            parts.append(f"GitHub Topics: {', '.join(p.topics)}")
+        if p.llm_description:
+            parts.append(f"AI描述: {p.llm_description}")
+        if p.llm_scenarios:
+            parts.append(f"适用场景: {p.llm_scenarios}")
+        context_parts.append("\n".join(parts))
+
+    return "\n\n---\n\n".join(context_parts)
+
+
+def _search_web(query: str) -> str:
+    """Search web for GitHub projects related to query."""
+    try:
+        settings = get_settings()
+        if not settings.llm_api_key:
+            return "未配置LLM API Key，无法进行Web搜索。"
+
+        # Use LLM to generate search suggestions
+        headers = {
+            "Authorization": f"Bearer {settings.llm_api_key}",
+            "Content-Type": "application/json",
+        }
+
+        prompt = f"""用户询问: {query}
+
+请推荐5个相关的GitHub开源项目，每个项目包含：
+1. 项目名称和GitHub链接
+2. 简短描述
+3. 主要功能
+4. 适用场景
+
+请以JSON格式返回：
+{{"projects": [{{"name": "...", "url": "...", "description": "...", "features": "...", "scenarios": "..."}}]}}"""
+
+        payload = {
+            "model": settings.llm_model,
+            "messages": [
+                {"role": "system", "content": "你是一个AI开源项目专家，擅长推荐相关的GitHub项目。"},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.7,
+            "max_tokens": 1500,
+        }
+
+        resp = requests.post(
+            f"{settings.llm_base_url}/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=30,
+        )
+
+        if resp.status_code != 200:
+            return f"Web搜索失败: HTTP {resp.status_code}"
+
+        content = resp.json()["choices"][0]["message"]["content"].strip()
+
+        # Extract JSON from response
+        try:
+            # Try to find JSON in the response
+            start = content.find("{")
+            end = content.rfind("}") + 1
+            if start != -1 and end != -1:
+                json_str = content[start:end]
+                data = json.loads(json_str)
+                projects = data.get("projects", [])
+
+                if projects:
+                    result_parts = ["## Web搜索结果\n"]
+                    for i, proj in enumerate(projects, 1):
+                        result_parts.append(f"### {i}. {proj.get('name', '未知')}")
+                        if proj.get("url"):
+                            result_parts.append(f"链接: {proj['url']}")
+                        if proj.get("description"):
+                            result_parts.append(f"描述: {proj['description']}")
+                        if proj.get("features"):
+                            result_parts.append(f"功能: {proj['features']}")
+                        if proj.get("scenarios"):
+                            result_parts.append(f"场景: {proj['scenarios']}")
+                        result_parts.append("")
+                    return "\n".join(result_parts)
+        except json.JSONDecodeError:
+            pass
+
+        return f"## Web搜索结果\n\n{content}"
+
+    except Exception as e:
+        logger.error("Web search failed: %s", e)
+        return f"Web搜索失败: {e}"
+
+
+def chat_with_ai(query: str) -> ChatResponse:
+    """Chat with AI about GitHub projects.
+
+    First searches knowledge graph, then falls back to web search.
+    """
+    settings = get_settings()
+    if not settings.llm_api_key:
+        return ChatResponse(
+            answer="未配置LLM API Key，请在设置中配置。",
+            sources=[],
+            from_graph=False,
+        )
+
+    # Build context from knowledge graph
+    graph_context = _build_project_context()
+
+    headers = {
+        "Authorization": f"Bearer {settings.llm_api_key}",
+        "Content-Type": "application/json",
+    }
+
+    # First, try to answer from knowledge graph
+    graph_prompt = f"""基于以下AI Radar知识图谱数据，回答用户的问题。
+
+知识图谱数据：
+{graph_context}
+
+用户问题：{query}
+
+请根据知识图谱中的信息回答。如果图谱中有相关项目，详细介绍它们。如果没有相关项目，请明确说明"知识图谱中没有找到相关项目"。"""
+
+    payload = {
+        "model": settings.llm_model,
+        "messages": [
+            {
+                "role": "system",
+                "content": "你是AI Radar的助手，基于知识图谱回答关于GitHub开源项目的问题。",
+            },
+            {"role": "user", "content": graph_prompt},
+        ],
+        "temperature": 0.3,
+        "max_tokens": 1500,
+    }
+
+    try:
+        resp = requests.post(
+            f"{settings.llm_base_url}/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=30,
+        )
+
+        if resp.status_code != 200:
+            return ChatResponse(
+                answer=f"AI请求失败: HTTP {resp.status_code}",
+                sources=[],
+                from_graph=False,
+            )
+
+        graph_answer = resp.json()["choices"][0]["message"]["content"].strip()
+
+        # Check if graph had relevant info
+        has_graph_info = "没有找到" not in graph_answer and "未找到" not in graph_answer
+
+        if has_graph_info:
+            return ChatResponse(
+                answer=graph_answer,
+                sources=["知识图谱"],
+                from_graph=True,
+            )
+
+        # Fall back to web search
+        web_result = _search_web(query)
+
+        # Combine answers
+        combined_answer = f"""{graph_answer}
+
+---
+
+{web_result}"""
+
+        return ChatResponse(
+            answer=combined_answer,
+            sources=["知识图谱", "Web搜索"],
+            from_graph=False,
+        )
+
+    except Exception as e:
+        logger.error("AI chat failed: %s", e)
+        return ChatResponse(
+            answer=f"AI请求失败: {e}",
+            sources=[],
+            from_graph=False,
+        )

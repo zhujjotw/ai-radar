@@ -68,6 +68,7 @@ def main() -> None:
             st.rerun()
 
     pages = [
+        st.Page("pages/chat.py", title="AI 助手", icon="💬"),
         st.Page("pages/radar.py", title="Radar", icon="📡"),
         st.Page("pages/trials.py", title="Trials", icon="🧪"),
         st.Page("pages/shares.py", title="Shares", icon="📤"),
