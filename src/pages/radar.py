@@ -274,13 +274,13 @@ else:
                 if st.button("前往 Trials 管理", key=f"goto_trial_{project.id}"):
                     st.switch_page("pages/trials.py")
             else:
-                claim_owner = st.text_input(
-                    "你的名字",
-                    key=f"claim_owner_{project.id}",
-                )
+                # Get username from IX-Auth login
+                user = st.session_state.get("user", {})
+                claim_owner = user.get("username", "")
+
                 if st.button("认领", key=f"claim_{project.id}"):
-                    if not claim_owner.strip():
-                        st.warning("请输入你的名字")
+                    if not claim_owner:
+                        st.warning("未获取到登录用户名")
                     else:
                         if not evaluation or evaluation.decision != "try":
                             if evaluation:
@@ -291,7 +291,7 @@ else:
                                 _evaluation_repo.create(new_eval)
                         trial = Trial(
                             project_id=project.id,
-                            owner=claim_owner.strip(),
+                            owner=claim_owner,
                             status="claimed",
                         )
                         _trial_repo.create(trial)
