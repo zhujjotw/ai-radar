@@ -1,4 +1,4 @@
-"""Knowledge graph page: one-hop ego graph visualization and reverse lookup."""
+"""Knowledge graph page: topic-based graph visualization from project topics."""
 
 from __future__ import annotations
 
@@ -9,177 +9,173 @@ from streamlit_agraph import Edge as AgraphEdge
 from streamlit_agraph import Node as AgraphNode
 
 from src.db import get_session, init_db
-from src.repositories import GraphRepository, ProjectRepository
-from src.services.graph_builder import (
-    find_projects_by_capability,
-    find_projects_by_dependency,
-    find_projects_by_domain,
-    get_project_ego_graph,
-)
-
-# Node type color mapping for visual distinction
-_NODE_COLORS: dict[str, str] = {
-    "Project": "#4e79a7",
-    "Domain": "#f28e2b",
-    "Capability": "#59a14f",
-    "Dependency": "#e15759",
-    "TeamAsset": "#b07aa1",
-}
-
-# Relation type display labels
-_RELATION_LABELS: dict[str, str] = {
-    "belongs_to": "belongs to",
-    "provides": "provides",
-    "depends_on": "depends on",
-    "similar_to": "similar to",
-    "produced": "produced",
-}
+from src.repositories import ProjectRepository
 
 # --- Database setup ---
 init_db()
 _session = get_session()
 _project_repo = ProjectRepository(_session)
-_graph_repo = GraphRepository(_session)
 
 # --- Page header ---
 st.title("Knowledge Graph")
-st.caption("Visualize project relationships and perform reverse lookups")
+st.caption("基于 GitHub Topics 的项目知识图谱")
 
-# --- Tab layout ---
-tab_ego, tab_reverse = st.tabs(["Project Ego Graph", "Reverse Lookup"])
+# --- Load all projects ---
+all_projects = _project_repo.list_with_options()
 
-# =========================================================================
-# Tab 1: Project Ego Graph — one-hop relationship visualization
-# =========================================================================
-with tab_ego:
-    # Project selector
-    all_projects = _project_repo.list_with_options(order_by="name", order_desc=False)
+if not all_projects:
+    st.info("没有找到项目。请先导入项目。")
+else:
+    # --- Build graph data from project topics ---
+    nodes: list[AgraphNode] = []
+    edges: list[AgraphEdge] = []
 
-    if not all_projects:
-        st.info("No projects found. Import projects first.")
-    else:
-        project_options = {f"{p.name} ({p.repo_full_name})": p for p in all_projects}
-        selected_label = st.selectbox(
-            "Select a project",
-            options=list(project_options.keys()),
-            key="kg_project_select",
+    # Track unique topics and projects
+    topic_nodes: dict[str, AgraphNode] = {}
+    project_nodes: dict[int, AgraphNode] = {}
+
+    # Colors for different node types
+    PROJECT_COLOR = "#4e79a7"  # Blue
+    TOPIC_COLOR = "#f28e2b"  # Orange
+
+    # Build nodes and edges
+    for project in all_projects:
+        if not project.id:
+            continue
+
+        # Create project node
+        project_node = AgraphNode(
+            id=f"project_{project.id}",
+            label=project.name,
+            title=f"Project: {project.name}\nStars: {project.stars}\nLanguage: {project.language or '-'}",
+            color=PROJECT_COLOR,
+            size=25,
+            shape="dot",
         )
-        selected_project = project_options[selected_label]
+        project_nodes[project.id] = project_node
+        nodes.append(project_node)
 
-        # Fetch ego graph data
-        ego_data = get_project_ego_graph(_session, selected_project.id)
-
-        if not ego_data["nodes"]:
-            st.warning(
-                f"No graph relationships found for **{selected_project.name}**. "
-                "Run graph building or add relationships first."
-            )
-        else:
-            # Build agraph Node/Edge objects
-            agraph_nodes: list[AgraphNode] = []
-            for node in ego_data["nodes"]:
-                node_type = node["node_type"]
-                agraph_nodes.append(
-                    AgraphNode(
-                        id=str(node["id"]),
-                        label=node["label"],
-                        title=f"{node_type}: {node['label']}",
-                        color=_NODE_COLORS.get(node_type, "#999999"),
-                        size=node["size"],
-                    )
+        # Create topic nodes and edges
+        topics = project.topics or []
+        for topic in topics:
+            # Create topic node if not exists
+            if topic not in topic_nodes:
+                topic_node = AgraphNode(
+                    id=f"topic_{topic}",
+                    label=topic,
+                    title=f"Topic: {topic}",
+                    color=TOPIC_COLOR,
+                    size=15,
+                    shape="diamond",
                 )
+                topic_nodes[topic] = topic_node
+                nodes.append(topic_node)
 
-            agraph_edges: list[AgraphEdge] = []
-            for edge in ego_data["edges"]:
-                agraph_edges.append(
-                    AgraphEdge(
-                        source=str(edge["source"]),
-                        target=str(edge["target"]),
-                        color="#cccccc",
-                    )
-                )
-
-            config = AgraphConfig(
-                width=800,
-                height=500,
-                directed=True,
-                physics=True,
-                hierarchical=False,
+            # Create edge from project to topic
+            edge = AgraphEdge(
+                source=f"project_{project.id}",
+                target=f"topic_{topic}",
+                color="#cccccc",
+                title=f"{project.name} → {topic}",
             )
+            edges.append(edge)
 
-            agraph(nodes=agraph_nodes, edges=agraph_edges, config=config)
+    # --- Display graph ---
+    st.subheader(f"项目-Topic 图谱 (共 {len(project_nodes)} 个项目, {len(topic_nodes)} 个 Topic)")
 
-            # Relationship list below the graph
-            st.divider()
-            st.subheader("Relationships")
-
-            # Build a lookup for node names by id
-            node_lookup = {str(n["id"]): n["label"] for n in ego_data["nodes"]}
-
-            # Group edges by relation type
-            for rel_type, rel_label in _RELATION_LABELS.items():
-                matching_edges = [e for e in ego_data["edges"] if e["relation_type"] == rel_type]
-                if not matching_edges:
-                    continue
-
-                st.markdown(f"**{rel_label}** ({len(matching_edges)})")
-                for edge in matching_edges:
-                    source_name = node_lookup.get(str(edge["source"]), "?")
-                    target_name = node_lookup.get(str(edge["target"]), "?")
-                    st.markdown(f"- {source_name} → {target_name}")
-
-# =========================================================================
-# Tab 2: Reverse Lookup — find projects by capability/dependency/domain
-# =========================================================================
-with tab_reverse:
-    st.subheader("Find Projects by Relationship")
-
-    lookup_type = st.selectbox(
-        "Lookup type",
-        options=["Capability", "Dependency", "Domain"],
-        key="kg_lookup_type",
+    # Graph configuration
+    config = AgraphConfig(
+        width=1000,
+        height=600,
+        directed=True,
+        physics=True,
+        hierarchical=False,
+        stabilization=True,
+        solver="forceAtlas2Based",
     )
 
-    # Get available node names for the selected type
-    available_names = _graph_repo.list_node_names_by_type(lookup_type)
+    # Render graph
+    agraph(nodes=nodes, edges=edges, config=config)
 
-    if not available_names:
-        st.info(f"No {lookup_type} nodes found in the knowledge graph.")
+    # --- Statistics ---
+    st.divider()
+    st.subheader("统计信息")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("项目数量", len(project_nodes))
+    with col2:
+        st.metric("Topic 数量", len(topic_nodes))
+    with col3:
+        st.metric("连接数量", len(edges))
+
+    # --- Topic distribution ---
+    st.divider()
+    st.subheader("Topic 分布")
+
+    # Count projects per topic
+    topic_counts: dict[str, int] = {}
+    for project in all_projects:
+        for topic in project.topics or []:
+            topic_counts[topic] = topic_counts.get(topic, 0) + 1
+
+    # Sort by count
+    sorted_topics = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)
+
+    # Display as bar chart
+    if sorted_topics:
+        chart_data = {
+            "Topic": [t[0] for t in sorted_topics[:20]],  # Top 20
+            "项目数量": [t[1] for t in sorted_topics[:20]],
+        }
+        st.bar_chart(chart_data, x="Topic", y="项目数量")
     else:
-        selected_name = st.selectbox(
-            f"Select a {lookup_type}",
-            options=available_names,
-            key="kg_lookup_name",
-        )
+        st.info("没有找到 Topic 数据。")
 
-        # Find related projects
-        if lookup_type == "Capability":
-            projects = find_projects_by_capability(_session, selected_name)
-        elif lookup_type == "Dependency":
-            projects = find_projects_by_dependency(_session, selected_name)
-        else:
-            projects = find_projects_by_domain(_session, selected_name)
+    # --- Project list with topics ---
+    st.divider()
+    st.subheader("项目详情")
 
-        st.divider()
+    # Filter by topic
+    all_topics = sorted(topic_counts.keys())
+    selected_topic = st.selectbox(
+        "按 Topic 筛选",
+        options=["所有 Topic"] + all_topics,
+        key="kg_topic_filter",
+    )
 
-        if not projects:
-            st.info(f"No projects found for {lookup_type}: **{selected_name}**")
-        else:
-            st.caption(f"Found {len(projects)} project(s)")
+    # Filter projects
+    if selected_topic == "所有 Topic":
+        filtered_projects = all_projects
+    else:
+        filtered_projects = [p for p in all_projects if selected_topic in (p.topics or [])]
 
-            for project in projects:
-                with st.expander(f"**{project.name}** — {project.repo_full_name}"):
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.markdown(f"**Stars:** {project.stars}")
-                        st.markdown(f"**Language:** {project.language or '-'}")
-                    with col2:
-                        st.markdown(f"**Pool:** {project.pool}")
-                        st.markdown(f"**Source:** {project.source}")
-                    with col3:
-                        st.markdown(f"[GitHub]({project.github_url})")
-                        if project.tags:
-                            st.markdown("**Tags:** " + ", ".join(project.tags))
+    # Display projects
+    for project in filtered_projects:
+        with st.expander(f"**{project.name}** — ⭐{project.stars}"):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.markdown(f"**Stars:** {project.stars:,}")
+                st.markdown(f"**Forks:** {project.forks:,}")
+                st.markdown(f"**Language:** {project.language or '-'}")
+            with col2:
+                st.markdown(f"**Pool:** {project.pool}")
+                st.markdown(f"**Source:** {project.source}")
+                if project.last_pushed_at:
+                    st.markdown(f"**Last Push:** {project.last_pushed_at.strftime('%Y-%m-%d')}")
+            with col3:
+                st.markdown(f"[GitHub]({project.github_url})")
+                if project.tags:
+                    st.markdown("**Tags:** " + " · ".join(project.tags))
 
-                    if project.description:
-                        st.markdown(f"> {project.description}")
+            if project.description:
+                st.markdown(f"> {project.description}")
+
+            if project.topics:
+                st.markdown("**Topics:** " + " · ".join(project.topics))
+
+            if project.llm_description:
+                st.divider()
+                st.markdown(f"**项目描述:** {project.llm_description}")
+                if project.llm_scenarios:
+                    st.markdown(f"**适用场景:**\n{project.llm_scenarios}")
