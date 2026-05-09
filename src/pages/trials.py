@@ -30,16 +30,18 @@ _trial_repo = TrialRepository(_session)
 st.title("Trials")
 st.caption("Claim projects for trial, track progress, and record outcomes")
 
-# --- Sidebar filters ---
-with st.sidebar:
-    st.header("Trial Filters")
+# --- Filters ---
+st.subheader("筛选")
+filter_cols = st.columns(2)
 
+with filter_cols[0]:
     status_filter = st.selectbox(
         "Status",
         options=["All"] + TRIAL_ALL_STATUSES,
         index=0,
     )
 
+with filter_cols[1]:
     owner_filter = st.text_input("Owner", value="")
 
 st.divider()
