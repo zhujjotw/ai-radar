@@ -43,7 +43,7 @@ st.caption("AI 开源项目候选池 — 浏览、评估、认领")
 
 # --- Filters ---
 st.subheader("筛选")
-filter_cols = st.columns(5)
+filter_cols = st.columns(4)
 
 with filter_cols[0]:
     pool_filter = st.selectbox(
@@ -58,18 +58,12 @@ with filter_cols[1]:
         index=0,
     )
 with filter_cols[2]:
-    decision_filter = st.selectbox(
-        "决策",
-        options=["全部决策", "watch", "try", "reject"],
-        index=0,
-    )
-with filter_cols[3]:
     source_filter = st.selectbox(
         "Source",
         options=["All", "baseline", "github_search", "external", "manual"],
         index=0,
     )
-with filter_cols[4]:
+with filter_cols[3]:
     all_tags = _project_repo.get_all_tags()
     tag_filter = st.selectbox(
         "方向",
@@ -143,8 +137,6 @@ if pool_filter != "All":
     kw["pool"] = pool_filter
 if filter_status_filter != "All":
     kw["filter_status"] = filter_status_filter
-if decision_filter != "全部决策":
-    kw["decision"] = decision_filter
 if source_filter != "All":
     kw["source"] = source_filter
 if tag_filter != "全部方向":
