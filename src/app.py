@@ -45,9 +45,27 @@ def _run_auto_refresh() -> None:
 def main() -> None:
     st.set_page_config(page_title="AI Radar", page_icon="🔭", layout="wide")
 
+    # Check if user is logged in
+    if not st.session_state.get("logged_in"):
+        # Show login page
+        login_page = st.Page("pages/login.py", title="登录", icon="🔐")
+        pg = st.navigation([login_page])
+        pg.run()
+        return
+
     # Auto-refresh check
     if _should_auto_refresh():
         _run_auto_refresh()
+
+    # Show user info in sidebar
+    user = st.session_state.get("user", {})
+    with st.sidebar:
+        st.divider()
+        st.caption(f"👤 {user.get('username', '未知')}")
+        if st.button("退出登录"):
+            del st.session_state["logged_in"]
+            del st.session_state["user"]
+            st.rerun()
 
     pages = [
         st.Page("pages/radar.py", title="Radar", icon="📡"),
