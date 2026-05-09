@@ -36,27 +36,9 @@ st.caption("AI 开源项目候选池 — 浏览、评估、认领")
 
 # --- Filters ---
 st.subheader("筛选")
-filter_cols = st.columns(4)
+filter_cols = st.columns(2)
 
 with filter_cols[0]:
-    pool_filter = st.selectbox(
-        "Pool",
-        options=["All", "baseline", "candidate"],
-        index=0,
-    )
-with filter_cols[1]:
-    filter_status_filter = st.selectbox(
-        "Filter Status",
-        options=["All", "needs_review", "passed", "filtered_out", "override"],
-        index=0,
-    )
-with filter_cols[2]:
-    source_filter = st.selectbox(
-        "Source",
-        options=["All", "baseline", "github_search", "external", "manual"],
-        index=0,
-    )
-with filter_cols[3]:
     all_tags = _project_repo.get_all_tags()
     tag_filter = st.selectbox(
         "方向",
@@ -64,24 +46,18 @@ with filter_cols[3]:
         index=0,
     )
 
-# Sort options
-sort_options = {
-    "推荐分优先": ("recommendation_sort", True),
-    "Stars 最多": ("stars", True),
-    "最新发现": ("first_seen_at", True),
-    "最近更新": ("last_pushed_at", True),
-    "未评估优先": ("unevaluated_sort", True),
-}
-sort_label = st.selectbox("排序", options=list(sort_options.keys()), index=0)
+with filter_cols[1]:
+    sort_options = {
+        "推荐分优先": ("recommendation_sort", True),
+        "Stars 最多": ("stars", True),
+        "最新发现": ("first_seen_at", True),
+        "最近更新": ("last_pushed_at", True),
+        "未评估优先": ("unevaluated_sort", True),
+    }
+    sort_label = st.selectbox("排序", options=list(sort_options.keys()), index=0)
 
 # --- Fetch projects ---
 kw: dict = {}
-if pool_filter != "All":
-    kw["pool"] = pool_filter
-if filter_status_filter != "All":
-    kw["filter_status"] = filter_status_filter
-if source_filter != "All":
-    kw["source"] = source_filter
 if tag_filter != "全部方向":
     kw["tag"] = tag_filter
 
