@@ -1,4 +1,7 @@
-"""Trial management page: claim, track, and update trial status for projects."""
+"""Trial management page: claim, track, and update trial status for projects.
+
+Uses the state_machine module for validated state transitions.
+"""
 
 from __future__ import annotations
 
@@ -7,9 +10,14 @@ import streamlit as st
 from src.db import get_session, init_db
 from src.models import Trial
 from src.repositories import EvaluationRepository, ProjectRepository, TrialRepository
-
-# Status flow: claimed → running → blocked / demo_done → shared / dropped
-VALID_STATUSES = ["claimed", "running", "blocked", "demo_done", "shared", "dropped"]
+from src.services.state_machine import (
+    TRIAL_ALL_STATUSES,
+    TRIAL_STATUS_META,
+    apply_trial_transition,
+    can_create_trial,
+    get_allowed_trial_transitions,
+    validate_trial_transition,
+)
 
 # --- Database setup ---
 init_db()
@@ -28,7 +36,7 @@ with st.sidebar:
 
     status_filter = st.selectbox(
         "Status",
-        options=["All"] + VALID_STATUSES,
+        options=["All"] + TRIAL_ALL_STATUSES,
         index=0,
     )
 
@@ -81,8 +89,10 @@ with tab_claims:
                     st.divider()
                     st.markdown(f"**Existing trials:** {len(existing_trials)}")
                     for t in existing_trials:
+                        meta = TRIAL_STATUS_META.get(t.status, {})
+                        emoji = meta.get("emoji", "❓")
                         st.markdown(
-                            f"- {t.owner}: **{t.status}** "
+                            f"- {emoji} {t.owner}: **{t.status}** "
                             f"(claimed {t.claimed_at.strftime('%Y-%m-%d')})"
                         )
 
@@ -91,32 +101,41 @@ with tab_claims:
                 if has_active_trial:
                     st.info("This project already has an active trial.")
                 else:
-                    st.markdown("##### Claim This Project")
-                    claim_owner = st.text_input(
-                        "Your name",
-                        key=f"claim_owner_{project.id}",
-                    )
-                    claim_due = st.date_input(
-                        "Due date (optional)",
-                        value=None,
-                        key=f"claim_due_{project.id}",
-                    )
+                    # Check if trial can be created
+                    can_claim = True
+                    claim_error = ""
+                    if eval_data:
+                        can_claim, claim_error = can_create_trial(eval_data)
 
-                    if st.button("Claim", key=f"claim_{project.id}"):
-                        if not claim_owner.strip():
-                            st.warning("Please enter your name.")
-                        else:
-                            trial = Trial(
-                                project_id=project.id,
-                                owner=claim_owner.strip(),
-                                status="claimed",
-                                due_date=claim_due,
-                            )
-                            _trial_repo.create(trial)
-                            st.success(
-                                f"Claimed **{project.name}** for trial by {claim_owner.strip()}"
-                            )
-                            st.rerun()
+                    if not can_claim:
+                        st.warning(claim_error)
+                    else:
+                        st.markdown("##### Claim This Project")
+                        claim_owner = st.text_input(
+                            "Your name",
+                            key=f"claim_owner_{project.id}",
+                        )
+                        claim_due = st.date_input(
+                            "Due date (optional)",
+                            value=None,
+                            key=f"claim_due_{project.id}",
+                        )
+
+                        if st.button("Claim", key=f"claim_{project.id}"):
+                            if not claim_owner.strip():
+                                st.warning("Please enter your name.")
+                            else:
+                                trial = Trial(
+                                    project_id=project.id,
+                                    owner=claim_owner.strip(),
+                                    status="claimed",
+                                    due_date=claim_due,
+                                )
+                                _trial_repo.create(trial)
+                                st.success(
+                                    f"Claimed **{project.name}** for trial by {claim_owner.strip()}"
+                                )
+                                st.rerun()
 
 
 # =========================================================================
@@ -141,15 +160,8 @@ with tab_active:
             project = _project_repo.get(trial.project_id) if trial.project_id else None
             project_name = project.name if project else "Unknown Project"
 
-            status_emoji = {
-                "claimed": "🆕",
-                "running": "🔄",
-                "blocked": "🚫",
-                "demo_done": "✅",
-                "shared": "📤",
-                "dropped": "❌",
-            }.get(trial.status, "❓")
-
+            meta = TRIAL_STATUS_META.get(trial.status, {})
+            status_emoji = meta.get("emoji", "❓")
             due_str = f" (due {trial.due_date})" if trial.due_date else ""
             header = f"{status_emoji} **{project_name}** — {trial.owner} [{trial.status}]{due_str}"
 
@@ -165,70 +177,97 @@ with tab_active:
                         if project.tags:
                             st.markdown("**Tags:** " + ", ".join(project.tags))
 
-                # Status transition
+                # Status transition with state machine
                 st.divider()
                 st.markdown("##### Update Status")
 
-                # Determine allowed transitions
-                allowed_next = {
-                    "claimed": ["running", "dropped"],
-                    "running": ["blocked", "demo_done", "dropped"],
-                    "blocked": ["running", "dropped"],
-                    "demo_done": ["shared", "dropped"],
-                    "shared": [],
-                    "dropped": ["claimed"],
-                }
-                next_statuses = allowed_next.get(trial.status, [])
-                current_idx = (
-                    VALID_STATUSES.index(trial.status) if trial.status in VALID_STATUSES else 0
-                )
+                # Get allowed transitions from state machine
+                allowed_transitions = get_allowed_trial_transitions(trial.status)
 
-                if next_statuses:
-                    new_status = st.selectbox(
+                if allowed_transitions:
+                    # Build options with labels
+                    transition_options = {
+                        t.target: f"{t.label} — {t.description}" for t in allowed_transitions
+                    }
+                    selected_target = st.selectbox(
                         "New status",
-                        options=next_statuses,
+                        options=list(transition_options.keys()),
+                        format_func=lambda x: transition_options[x],
                         key=f"status_{trial.id}",
                     )
 
+                    # Show validation feedback
+                    validation_error = validate_trial_transition(trial, selected_target)
+                    if validation_error:
+                        st.warning(f"⚠️ {validation_error}")
+
                     # Additional fields for specific transitions
                     blockers_input = None
-                    if new_status == "blocked":
+                    if selected_target == "blocked":
                         blockers_input = st.text_area(
                             "Blockers (required)",
                             value=trial.blockers or "",
                             key=f"blockers_{trial.id}",
+                            help="Describe what is blocking progress",
                         )
-                    elif new_status == "demo_done":
-                        st.warning("Trial must have a result summary before marking demo_done.")
 
                     drop_reason = None
-                    if new_status == "dropped":
+                    if selected_target == "dropped":
                         drop_reason = st.text_input(
                             "Drop reason",
                             key=f"drop_reason_{trial.id}",
+                            help="Why is this trial being dropped?",
                         )
 
                     if st.button("Update Status", key=f"update_status_{trial.id}"):
-                        if new_status == "blocked" and not blockers_input.strip():
-                            st.warning("Please describe what is blocking progress.")
-                        elif new_status == "demo_done" and not trial.result_summary:
-                            st.warning(
-                                "Please fill in the Result Summary below "
-                                "before marking as demo_done."
-                            )
-                        else:
-                            trial.status = new_status
-                            if blockers_input is not None:
-                                trial.blockers = blockers_input.strip() or None
-                            if drop_reason is not None:
+                        # Apply transition through state machine
+                        try:
+                            # Handle blockers for blocked status
+                            if selected_target == "blocked" and blockers_input:
+                                trial.blockers = blockers_input.strip()
+
+                            # Auto-set result_summary from input field for demo_done
+                            if selected_target == "demo_done":
+                                result_input = st.session_state.get(f"edit_result_{trial.id}")
+                                if result_input and result_input.strip():
+                                    trial.result_summary = result_input.strip()
+
+                            apply_trial_transition(trial, selected_target)
+
+                            # Handle drop reason
+                            if drop_reason and drop_reason.strip():
                                 trial.trial_notes = (
-                                    (trial.trial_notes or "") + f"\n[Dropped: {drop_reason}]"
+                                    (trial.trial_notes or "")
+                                    + f"\n[Dropped: {drop_reason.strip()}]"
                                 ).strip()
+
                             _trial_repo.update(trial)
-                            st.success(f"Status updated to **{new_status}**")
+                            st.success(f"Status updated to **{selected_target}**")
                             st.rerun()
+                        except Exception as e:
+                            st.error(f"Transition failed: {e}")
                 else:
                     st.info(f"No further transitions available from **{trial.status}**.")
+
+                # Visual state diagram
+                with st.expander("📋 State Diagram", expanded=False):
+                    st.markdown("""
+                    ```mermaid
+                    stateDiagram-v2
+                        [*] --> claimed
+                        claimed --> running
+                        claimed --> dropped
+                        running --> blocked
+                        running --> demo_done
+                        running --> dropped
+                        blocked --> running
+                        blocked --> dropped
+                        demo_done --> shared
+                        demo_done --> dropped
+                        shared --> [*]
+                        dropped --> claimed
+                    ```
+                    """)
 
                 # Editable fields
                 st.divider()
@@ -263,6 +302,7 @@ with tab_active:
                     "Result Summary",
                     value=trial.result_summary or "",
                     key=f"edit_result_{trial.id}",
+                    help="Required before marking demo_done or shared",
                 )
                 edit_next = st.text_input(
                     "Next Action",
