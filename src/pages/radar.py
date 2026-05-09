@@ -74,8 +74,6 @@ sort_options = {
 }
 sort_label = st.selectbox("排序", options=list(sort_options.keys()), index=0)
 
-st.divider()
-
 # --- Fetch projects ---
 kw: dict = {}
 if pool_filter != "All":
@@ -224,14 +222,12 @@ else:
             st.markdown(f"[View on GitHub]({project.github_url})")
 
             if project.llm_description:
-                st.divider()
                 st.markdown(f"**项目描述:** {project.llm_description}")
                 if project.llm_scenarios:
                     st.markdown(f"**适用场景:**\n{project.llm_scenarios}")
 
             # ---- Evaluation Info ----
             if evaluation:
-                st.divider()
                 st.markdown("##### 评估信息")
                 eval_cols = st.columns(5)
                 eval_cols[0].metric("相关性", evaluation.relevance_score or "-")
@@ -248,7 +244,6 @@ else:
             trials = _trial_cache.get(project.id, [])
             active_trials = [t for t in trials if t.status not in ("dropped",)]
             if active_trials:
-                st.divider()
                 st.markdown("##### 试用信息")
                 for t in active_trials:
                     t_cols = st.columns([2, 2, 2, 2])
@@ -266,7 +261,6 @@ else:
                         st.markdown(f"**阻塞项:** {t.blockers}")
 
             # ---- Actions ----
-            st.divider()
 
             if _has_active_trial(project.id):
                 st.info(f"已由 {owner} 认领")
