@@ -34,10 +34,46 @@ def _build_project_context() -> str:
 
     projects = project_repo.list_with_options()
 
-    if not projects:
-        return "暂无项目数据。"
+    # Add AI Radar platform info
+    platform_info = """## AI Radar 平台介绍
 
-    context_parts = ["以下是AI Radar知识图谱中的项目信息：\n"]
+AI Radar 是一个 AI 开源项目雷达与技术吸收工作台，用于帮助团队发现、评估、试用和归档 GitHub 上的开源 AI 项目。
+
+### 主要功能
+
+1. **AI 助手** - 基于知识图谱的智能问答，可以查询项目信息和状态
+2. **Radar** - 候选项目池，浏览、筛选、评估和认领项目
+3. **Trials** - 试用管理，跟踪项目试用状态和进度
+4. **Shares** - 分享归档，记录试用结论和经验
+5. **Knowledge Graph** - 知识图谱，可视化项目关系
+
+### 使用流程
+
+1. **发现项目** - 系统自动从 GitHub Search 和 GitHub Trending 抓取项目
+2. **初筛评估** - 设置项目方向标签、评估推荐分
+3. **认领试用** - 团队成员认领感兴趣的项目进行试用
+4. **记录结论** - 试用完成后记录结果和经验
+5. **归档分享** - 将结论沉淀到知识图谱
+
+### 项目状态说明
+
+- **needs_review** - 待评估
+- **watch** - 关注中
+- **try** - 可试用
+- **reject** - 不相关
+- **adopt** - 已采纳
+- **claimed** - 已认领
+- **running** - 试用中
+- **blocked** - 阻塞
+- **demo_done** - 演示完成
+- **shared** - 已分享
+
+"""
+
+    if not projects:
+        return platform_info + "\n暂无项目数据。"
+
+    context_parts = [platform_info + "以下是AI Radar知识图谱中的项目信息：\n"]
 
     for p in projects:
         parts = [f"## {p.name}"]
@@ -215,7 +251,12 @@ def chat_with_ai(query: str) -> ChatResponse:
 
 用户问题：{query}
 
-请根据知识图谱中的信息回答。如果图谱中有相关项目，详细介绍它们。如果没有相关项目，请明确说明"知识图谱中没有找到相关项目"。"""
+请根据知识图谱中的信息回答。请注意：
+1. 如果用户询问AI Radar平台本身的使用方法、功能、流程等，请根据平台介绍部分回答
+2. 如果用户询问具体的GitHub项目，请根据项目信息部分回答
+3. 如果用户询问项目状态（认领、试用等），请根据项目的评估和试用信息回答
+4. 如果没有找到相关信息，请明确说明"知识图谱中没有找到相关项目"
+5. 只有在用户明确询问新项目推荐时，才需要进行Web搜索"""
 
     payload = {
         "model": settings.llm_model,
