@@ -163,13 +163,26 @@ def _search_web(query: str) -> str:
 3. 主要功能
 4. 适用场景
 
-请以JSON格式返回：
-{{"projects": [{{"name": "...", "url": "...", "description": "...", "features": "...", "scenarios": "..."}}]}}"""
+请直接以Markdown格式返回结果，使用以下格式：
+
+## Web搜索结果
+
+### 1. 项目名称
+链接: GitHub链接
+描述: 项目描述
+功能: 主要功能
+场景: 适用场景
+
+### 2. 项目名称
+..."""
 
         payload = {
             "model": settings.llm_model,
             "messages": [
-                {"role": "system", "content": "你是一个AI开源项目专家，擅长推荐相关的GitHub项目。"},
+                {
+                    "role": "system",
+                    "content": "你是一个AI开源项目专家，擅长推荐相关的GitHub项目。请直接以Markdown格式回答，不要返回JSON格式。",
+                },
                 {"role": "user", "content": prompt},
             ],
             "temperature": 0.7,
@@ -188,34 +201,38 @@ def _search_web(query: str) -> str:
 
         content = _extract_content(resp.json())
 
-        # Extract JSON from response
-        try:
-            # Try to find JSON in the response
-            start = content.find("{")
-            end = content.rfind("}") + 1
-            if start != -1 and end != -1:
-                json_str = content[start:end]
-                data = json.loads(json_str)
-                projects = data.get("projects", [])
+        # If content is empty or looks like JSON, try to parse it
+        if not content or content.strip().startswith("{"):
+            try:
+                # Try to find JSON in the response
+                start = content.find("{")
+                end = content.rfind("}") + 1
+                if start != -1 and end != -1:
+                    json_str = content[start:end]
+                    data = json.loads(json_str)
+                    projects = data.get("projects", [])
 
-                if projects:
-                    result_parts = ["## Web搜索结果\n"]
-                    for i, proj in enumerate(projects, 1):
-                        result_parts.append(f"### {i}. {proj.get('name', '未知')}")
-                        if proj.get("url"):
-                            result_parts.append(f"链接: {proj['url']}")
-                        if proj.get("description"):
-                            result_parts.append(f"描述: {proj['description']}")
-                        if proj.get("features"):
-                            result_parts.append(f"功能: {proj['features']}")
-                        if proj.get("scenarios"):
-                            result_parts.append(f"场景: {proj['scenarios']}")
-                        result_parts.append("")
-                    return "\n".join(result_parts)
-        except json.JSONDecodeError:
-            pass
+                    if projects:
+                        result_parts = ["## Web搜索结果\n"]
+                        for i, proj in enumerate(projects, 1):
+                            result_parts.append(f"### {i}. {proj.get('name', '未知')}")
+                            if proj.get("url"):
+                                result_parts.append(f"链接: {proj['url']}")
+                            if proj.get("description"):
+                                result_parts.append(f"描述: {proj['description']}")
+                            if proj.get("features"):
+                                result_parts.append(f"功能: {proj['features']}")
+                            if proj.get("scenarios"):
+                                result_parts.append(f"场景: {proj['scenarios']}")
+                            result_parts.append("")
+                        return "\n".join(result_parts)
+            except json.JSONDecodeError:
+                pass
 
-        return f"## Web搜索结果\n\n{content}"
+        # Return content as is (should be Markdown format)
+        if content and not content.strip().startswith("##"):
+            return f"## Web搜索结果\n\n{content}"
+        return content
 
     except Exception as e:
         logger.error("Web search failed: %s", e)
