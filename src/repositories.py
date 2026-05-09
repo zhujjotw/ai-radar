@@ -186,6 +186,20 @@ class ShareRepository:
         self.session.refresh(share)
         return share
 
+    def get(self, share_id: int) -> Share | None:
+        return self.session.get(Share, share_id)
+
+    def get_by_trial_id(self, trial_id: int) -> Share | None:
+        statement = select(Share).where(Share.trial_id == trial_id)
+        return self.session.exec(statement).first()
+
+    def list_by_shared_by(self, shared_by: str) -> list[Share]:
+        statement = select(Share).where(Share.shared_by == shared_by)
+        return list(self.session.exec(statement).all())
+
+    def list_all(self) -> list[Share]:
+        return list(self.session.exec(select(Share)).all())
+
 
 class GraphRepository:
     def __init__(self, session: Session):
