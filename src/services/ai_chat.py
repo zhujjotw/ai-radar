@@ -222,10 +222,10 @@ def _search_web(query: str) -> str:
         return f"Web搜索失败: {e}"
 
 
-def chat_with_ai(query: str) -> ChatResponse:
+def chat_with_ai(query: str, enable_web_search: bool = False) -> ChatResponse:
     """Chat with AI about GitHub projects.
 
-    First searches knowledge graph, then falls back to web search.
+    First searches knowledge graph, then falls back to web search if enabled.
     """
     settings = get_settings()
     if not settings.llm_api_key:
@@ -296,6 +296,14 @@ def chat_with_ai(query: str) -> ChatResponse:
                 answer=graph_answer,
                 sources=["知识图谱"],
                 from_graph=True,
+            )
+
+        # If web search is disabled, return graph answer only
+        if not enable_web_search:
+            return ChatResponse(
+                answer=graph_answer,
+                sources=["知识图谱"],
+                from_graph=False,
             )
 
         # Fall back to web search

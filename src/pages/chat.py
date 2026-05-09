@@ -14,13 +14,32 @@ st.caption("基于知识图谱的GitHub项目检索")
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Initialize web search toggle
+if "web_search_enabled" not in st.session_state:
+    st.session_state.web_search_enabled = False
+
 # Display chat history
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Chat input
-if prompt := st.chat_input("询问关于GitHub项目的问题..."):
+# Chat input with web search toggle
+col1, col2 = st.columns([4, 1])
+
+with col1:
+    prompt = st.chat_input("询问关于GitHub项目的问题...")
+
+with col2:
+    st.write("")  # Spacer
+    st.write("")  # Spacer
+    web_search = st.toggle(
+        "Web搜索",
+        value=st.session_state.web_search_enabled,
+        help="开启后，当知识图谱中没有相关信息时会进行Web搜索",
+    )
+    st.session_state.web_search_enabled = web_search
+
+if prompt:
     # Add user message to chat history
     st.session_state.messages.append({"role": "user", "content": prompt})
 
@@ -31,7 +50,7 @@ if prompt := st.chat_input("询问关于GitHub项目的问题..."):
     # Get AI response
     with st.chat_message("assistant"):
         with st.spinner("正在检索知识图谱..."):
-            response = chat_with_ai(prompt)
+            response = chat_with_ai(prompt, enable_web_search=st.session_state.web_search_enabled)
 
             # Display answer
             st.markdown(response.answer)
@@ -45,6 +64,19 @@ if prompt := st.chat_input("询问关于GitHub项目的问题..."):
 
 # Sidebar with example queries
 with st.sidebar:
+    st.header("设置")
+
+    # Web search toggle in sidebar
+    web_search_sidebar = st.toggle(
+        "启用Web搜索",
+        value=st.session_state.web_search_enabled,
+        help="开启后，当知识图谱中没有相关信息时会进行Web搜索",
+        key="web_search_sidebar",
+    )
+    st.session_state.web_search_enabled = web_search_sidebar
+
+    st.divider()
+
     st.header("示例查询")
     st.markdown("""
     **项目检索：**
@@ -60,6 +92,11 @@ with st.sidebar:
     - 有哪些项目已完成demo？
     - 谁在负责项目试用？
     - 当前有哪些blocked项目？
+
+    **平台使用：**
+    - AI Radar怎么使用？
+    - 项目状态有哪些？
+    - 怎么认领项目？
     """)
 
     if st.button("清空对话"):
