@@ -118,9 +118,7 @@ with tab_ego:
 
             # Group edges by relation type
             for rel_type, rel_label in _RELATION_LABELS.items():
-                matching_edges = [
-                    e for e in ego_data["edges"] if e["relation_type"] == rel_type
-                ]
+                matching_edges = [e for e in ego_data["edges"] if e["relation_type"] == rel_type]
                 if not matching_edges:
                     continue
 

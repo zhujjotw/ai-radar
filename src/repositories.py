@@ -282,4 +282,3 @@ class GraphRepository:
 
         statement = select(distinct(GraphNode.name)).where(GraphNode.node_type == node_type)
         return sorted(self.session.exec(statement).all())
-

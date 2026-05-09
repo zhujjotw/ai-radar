@@ -109,7 +109,7 @@ def build_project_graph(session: Session, project: Project) -> None:
     )
 
     # 2. Domain nodes from tags (Agent, RAG, Eval, …)
-    for tag in (project.tags or []):
+    for tag in project.tags or []:
         domain_node = _ensure_node(
             graph_repo,
             node_type="Domain",
@@ -127,7 +127,7 @@ def build_project_graph(session: Session, project: Project) -> None:
         )
 
     # 3. Capability nodes from topics
-    for topic in (project.topics or []):
+    for topic in project.topics or []:
         capability_node = _ensure_node(
             graph_repo,
             node_type="Capability",
@@ -283,21 +283,25 @@ def get_project_ego_graph(
     agraph_nodes: list[dict[str, Any]] = []
     for node in nodes:
         size = 25 if node.node_type == "Project" else 15
-        agraph_nodes.append({
-            "id": node.id,
-            "label": node.name,
-            "node_type": node.node_type,
-            "size": size,
-        })
+        agraph_nodes.append(
+            {
+                "id": node.id,
+                "label": node.name,
+                "node_type": node.node_type,
+                "size": size,
+            }
+        )
 
     agraph_edges: list[dict[str, Any]] = []
     for edge in edges:
-        agraph_edges.append({
-            "source": edge.source_node_id,
-            "target": edge.target_node_id,
-            "label": edge.relation_type,
-            "relation_type": edge.relation_type,
-        })
+        agraph_edges.append(
+            {
+                "source": edge.source_node_id,
+                "target": edge.target_node_id,
+                "label": edge.relation_type,
+                "relation_type": edge.relation_type,
+            }
+        )
 
     return {"nodes": agraph_nodes, "edges": agraph_edges}
 

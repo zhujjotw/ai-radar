@@ -121,13 +121,13 @@ else:
     st.caption(f"Showing {len(projects)} project(s)")
 
     for project in projects:
-        evaluation = (
-            _evaluation_repo.get_latest_by_project(project.id) if project.id else None
-        )
+        evaluation = _evaluation_repo.get_latest_by_project(project.id) if project.id else None
 
         # Build header line
         decision_badge = f" [{evaluation.decision}]" if evaluation else ""
-        filter_badge = f" [{project.filter_status}]" if project.filter_status != "needs_review" else ""
+        filter_badge = (
+            f" [{project.filter_status}]" if project.filter_status != "needs_review" else ""
+        )
         header = f"**{project.name}** ⭐{project.stars}{decision_badge}{filter_badge}"
 
         with st.expander(header, expanded=False):

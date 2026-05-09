@@ -117,9 +117,7 @@ class TestShareRepositoryGetByTrialId:
         assert result is not None
         assert result.id == share.id
 
-    def test_returns_none_for_trial_without_share(
-        self, share_repo, trial_repo, project_repo
-    ):
+    def test_returns_none_for_trial_without_share(self, share_repo, trial_repo, project_repo):
         project = project_repo.upsert(_make_project())
         trial = trial_repo.create(_make_trial(project.id))
         result = share_repo.get_by_trial_id(trial.id)
@@ -166,9 +164,7 @@ class TestShareRepositoryListAll:
 
 
 class TestShareCreationIntegration:
-    def test_create_share_updates_trial_to_shared(
-        self, share_repo, trial_repo, project_repo
-    ):
+    def test_create_share_updates_trial_to_shared(self, share_repo, trial_repo, project_repo):
         """Creating a share should update the trial status to 'shared'."""
         project = project_repo.upsert(_make_project())
         trial = trial_repo.create(_make_trial(project.id, status="demo_done"))
@@ -183,9 +179,7 @@ class TestShareCreationIntegration:
         updated_trial = trial_repo.get(trial.id)
         assert updated_trial.status == "shared"
 
-    def test_share_creates_team_asset_graph(
-        self, share_repo, trial_repo, project_repo, session
-    ):
+    def test_share_creates_team_asset_graph(self, share_repo, trial_repo, project_repo, session):
         """build_share_graph creates TeamAsset node and produced edge."""
         project = project_repo.upsert(_make_project(name="LangGraph"))
         build_project_graph(session, project)
@@ -208,9 +202,7 @@ class TestShareCreationIntegration:
         assert len(team_asset_nodes) >= 1
         assert team_asset_nodes[0].name == share.title
 
-    def test_share_prevents_duplicate_for_same_trial(
-        self, share_repo, trial_repo, project_repo
-    ):
+    def test_share_prevents_duplicate_for_same_trial(self, share_repo, trial_repo, project_repo):
         """get_by_trial_id returns existing share, preventing duplicates."""
         project = project_repo.upsert(_make_project())
         trial = trial_repo.create(_make_trial(project.id))
@@ -220,9 +212,7 @@ class TestShareCreationIntegration:
         existing = share_repo.get_by_trial_id(trial.id)
         assert existing is not None  # Should find existing share
 
-    def test_demo_done_trial_not_shown_after_share(
-        self, trial_repo, project_repo, share_repo
-    ):
+    def test_demo_done_trial_not_shown_after_share(self, trial_repo, project_repo, share_repo):
         """After sharing, trial no longer appears in demo_done list."""
         project = project_repo.upsert(_make_project())
         trial = trial_repo.create(_make_trial(project.id, status="demo_done"))
@@ -271,15 +261,11 @@ class TestShareMarkdownExport:
         assert "alice" in md
         assert "produced" in md
 
-    def test_export_share_markdown_minimal(
-        self, share_repo, trial_repo, project_repo, session
-    ):
+    def test_export_share_markdown_minimal(self, share_repo, trial_repo, project_repo, session):
         """Markdown export works with only required fields."""
         project = project_repo.upsert(_make_project())
         trial = trial_repo.create(_make_trial(project.id))
-        share = share_repo.create(
-            Share(trial_id=trial.id, title="Minimal Share")
-        )
+        share = share_repo.create(Share(trial_id=trial.id, title="Minimal Share"))
 
         md = export_share_markdown(session, share.id)
         assert md != ""
@@ -295,37 +281,41 @@ class TestShareMarkdownExport:
 
 
 class TestEndToEndShareFlow:
-    def test_full_share_flow(
-        self, trial_repo, project_repo, share_repo, session
-    ):
+    def test_full_share_flow(self, trial_repo, project_repo, share_repo, session):
         """Complete flow: project → trial → demo_done → share → graph → markdown."""
         # 1. Project exists with graph
-        project = project_repo.upsert(_make_project(
-            name="CrewAI",
-            repo_full_name="crewai/crewai",
-            tags=["Agent", "Workflow"],
-        ))
+        project = project_repo.upsert(
+            _make_project(
+                name="CrewAI",
+                repo_full_name="crewai/crewai",
+                tags=["Agent", "Workflow"],
+            )
+        )
         build_project_graph(session, project)
 
         # 2. Trial is demo_done
-        trial = trial_repo.create(Trial(
-            project_id=project.id,
-            owner="bob",
-            status="demo_done",
-            result_summary="Great multi-agent orchestration",
-            demo_url="https://demo.crewai.com",
-        ))
+        trial = trial_repo.create(
+            Trial(
+                project_id=project.id,
+                owner="bob",
+                status="demo_done",
+                result_summary="Great multi-agent orchestration",
+                demo_url="https://demo.crewai.com",
+            )
+        )
 
         # 3. Create share
-        share = share_repo.create(Share(
-            trial_id=trial.id,
-            title="CrewAI Multi-Agent Trial",
-            summary="CrewAI enables building multi-agent systems",
-            key_findings="Role-based agent design works well",
-            reusable_patterns="Agent crew composition pattern",
-            applicable_scenarios="Complex multi-step workflows",
-            shared_by="bob",
-        ))
+        share = share_repo.create(
+            Share(
+                trial_id=trial.id,
+                title="CrewAI Multi-Agent Trial",
+                summary="CrewAI enables building multi-agent systems",
+                key_findings="Role-based agent design works well",
+                reusable_patterns="Agent crew composition pattern",
+                applicable_scenarios="Complex multi-step workflows",
+                shared_by="bob",
+            )
+        )
 
         # 4. Update trial to shared
         trial.status = "shared"
@@ -353,16 +343,10 @@ class TestEndToEndShareFlow:
         assert "produced" in md
         assert "Agent" in md or "belongs_to" in md
 
-    def test_multiple_shares_different_trials(
-        self, trial_repo, project_repo, share_repo
-    ):
+    def test_multiple_shares_different_trials(self, trial_repo, project_repo, share_repo):
         """Multiple projects can each have their own share records."""
-        p1 = project_repo.upsert(_make_project(
-            name="Proj A", repo_full_name="a/proj-a"
-        ))
-        p2 = project_repo.upsert(_make_project(
-            name="Proj B", repo_full_name="b/proj-b"
-        ))
+        p1 = project_repo.upsert(_make_project(name="Proj A", repo_full_name="a/proj-a"))
+        p2 = project_repo.upsert(_make_project(name="Proj B", repo_full_name="b/proj-b"))
 
         t1 = trial_repo.create(_make_trial(p1.id, owner="alice"))
         t2 = trial_repo.create(_make_trial(p2.id, owner="bob"))

@@ -40,4 +40,3 @@ def resolve_db_path() -> Path:
     if not db_path.is_absolute():
         db_path = ROOT_DIR / db_path
     return db_path
-

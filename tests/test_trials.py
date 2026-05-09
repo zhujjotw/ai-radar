@@ -131,9 +131,7 @@ class TestTrialRepositoryUpdateStatus:
     def test_update_status_with_blockers(self, trial_repo, project_repo):
         project = project_repo.upsert(_make_project())
         trial = trial_repo.create(_make_trial(project.id, status="running"))
-        updated = trial_repo.update_status(
-            trial.id, "blocked", blockers="Missing GPU drivers"
-        )
+        updated = trial_repo.update_status(trial.id, "blocked", blockers="Missing GPU drivers")
         assert updated.status == "blocked"
         assert updated.blockers == "Missing GPU drivers"
 
@@ -225,11 +223,13 @@ class TestTrialLifecycleIntegration:
         evaluation_repo.create(Evaluation(project_id=project.id, decision="try"))
 
         # Claim
-        trial = trial_repo.create(Trial(
-            project_id=project.id,
-            owner="alice",
-            status="claimed",
-        ))
+        trial = trial_repo.create(
+            Trial(
+                project_id=project.id,
+                owner="alice",
+                status="claimed",
+            )
+        )
         assert trial.status == "claimed"
 
         # Transition to running
@@ -262,9 +262,7 @@ class TestTrialLifecycleIntegration:
         assert resumed.status == "running"
         assert resumed.blockers is None
 
-    def test_running_to_demo_done_requires_result_summary(
-        self, trial_repo, project_repo
-    ):
+    def test_running_to_demo_done_requires_result_summary(self, trial_repo, project_repo):
         """Demo done requires result summary (business rule)."""
         project = project_repo.upsert(_make_project())
         trial = trial_repo.create(_make_trial(project.id, status="running"))
@@ -285,11 +283,13 @@ class TestTrialLifecycleIntegration:
     def test_demo_done_to_shared(self, trial_repo, project_repo):
         """Trial can go from demo_done to shared (T8 will use this)."""
         project = project_repo.upsert(_make_project())
-        trial = trial_repo.create(_make_trial(
-            project.id,
-            status="demo_done",
-            result_summary="Excellent tool",
-        ))
+        trial = trial_repo.create(
+            _make_trial(
+                project.id,
+                status="demo_done",
+                result_summary="Excellent tool",
+            )
+        )
 
         trial.status = "shared"
         updated = trial_repo.update(trial)
@@ -332,13 +332,15 @@ class TestTrialLifecycleIntegration:
         from datetime import date
 
         project = project_repo.upsert(_make_project())
-        trial = trial_repo.create(Trial(
-            project_id=project.id,
-            owner="alice",
-            status="claimed",
-            due_date=date(2026, 6, 1),
-            environment="AWS EC2 g4dn.xlarge",
-        ))
+        trial = trial_repo.create(
+            Trial(
+                project_id=project.id,
+                owner="alice",
+                status="claimed",
+                due_date=date(2026, 6, 1),
+                environment="AWS EC2 g4dn.xlarge",
+            )
+        )
         assert trial.due_date == date(2026, 6, 1)
         assert trial.environment == "AWS EC2 g4dn.xlarge"
 
@@ -357,17 +359,21 @@ class TestTrialLifecycleIntegration:
     def test_end_to_end_trial_flow(self, trial_repo, project_repo, evaluation_repo):
         """Complete flow: evaluate → try → claim → run → demo_done."""
         # 1. Project exists
-        project = project_repo.upsert(_make_project(
-            name="LangGraph",
-            repo_full_name="langchain-ai/langgraph",
-        ))
+        project = project_repo.upsert(
+            _make_project(
+                name="LangGraph",
+                repo_full_name="langchain-ai/langgraph",
+            )
+        )
 
         # 2. Evaluate as "try"
-        evaluation_repo.create(Evaluation(
-            project_id=project.id,
-            decision="try",
-            recommendation_score=8,
-        ))
+        evaluation_repo.create(
+            Evaluation(
+                project_id=project.id,
+                decision="try",
+                recommendation_score=8,
+            )
+        )
 
         # Verify it shows up as "try" project
         try_projects = project_repo.list_with_options(decision="try")
@@ -375,11 +381,13 @@ class TestTrialLifecycleIntegration:
         assert try_projects[0].name == "LangGraph"
 
         # 3. Claim
-        trial = trial_repo.create(Trial(
-            project_id=project.id,
-            owner="alice",
-            status="claimed",
-        ))
+        trial = trial_repo.create(
+            Trial(
+                project_id=project.id,
+                owner="alice",
+                status="claimed",
+            )
+        )
 
         # 4. Start running
         trial.status = "running"

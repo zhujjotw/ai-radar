@@ -58,10 +58,7 @@ with tab_create:
             if existing_share is not None:
                 continue  # Already shared — skip
 
-            header = (
-                f"**{project_name}** — {trial.owner} "
-                f"(result: {trial.result_summary or '-'})"
-            )
+            header = f"**{project_name}** — {trial.owner} (result: {trial.result_summary or '-'})"
 
             with st.expander(header, expanded=False):
                 # Project info
@@ -155,8 +152,7 @@ with tab_list:
         all_shares = [
             s
             for s in all_shares
-            if s.shared_by
-            and shared_by_filter.strip().lower() in s.shared_by.lower()
+            if s.shared_by and shared_by_filter.strip().lower() in s.shared_by.lower()
         ]
 
     if not all_shares:
@@ -166,9 +162,7 @@ with tab_list:
 
         for share in all_shares:
             trial = _trial_repo.get(share.trial_id)
-            project = (
-                _project_repo.get(trial.project_id) if trial else None
-            )
+            project = _project_repo.get(trial.project_id) if trial else None
             project_name = project.name if project else "Unknown Project"
 
             date_str = share.shared_at.strftime("%Y-%m-%d") if share.shared_at else "-"

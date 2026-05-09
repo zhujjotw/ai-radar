@@ -356,17 +356,19 @@ def seed(session: Session) -> dict:
         has_quickstart=crewai.has_quickstart,
         tags=crewai.tags,
     )
-    eval_repo.create(Evaluation(
-        project_id=crewai.id,
-        relevance_score=score_crewai["relevance_score"],
-        trialability_score=score_crewai["trialability_score"],
-        value_score=score_crewai["value_score"],
-        recommendation_score=score_crewai["recommendation_score"],
-        decision="try",
-        decision_reason="Multi-agent framework, active community",
-        evidence=score_crewai["evidence"],
-        evaluated_by="demo_user",
-    ))
+    eval_repo.create(
+        Evaluation(
+            project_id=crewai.id,
+            relevance_score=score_crewai["relevance_score"],
+            trialability_score=score_crewai["trialability_score"],
+            value_score=score_crewai["value_score"],
+            recommendation_score=score_crewai["recommendation_score"],
+            decision="try",
+            decision_reason="Multi-agent framework, active community",
+            evidence=score_crewai["evidence"],
+            evaluated_by="demo_user",
+        )
+    )
     crewai = project_repo.get(crewai.id)  # refresh
     print(f"  Created evaluation for {crewai.name} (decision=try)")
 
@@ -382,57 +384,65 @@ def seed(session: Session) -> dict:
         has_quickstart=autogen.has_quickstart,
         tags=autogen.tags,
     )
-    eval_repo.create(Evaluation(
-        project_id=autogen.id,
-        relevance_score=score_autogen["relevance_score"],
-        trialability_score=score_autogen["trialability_score"],
-        value_score=score_autogen["value_score"],
-        recommendation_score=score_autogen["recommendation_score"],
-        decision="watch",
-        decision_reason="Interesting but complex, keep watching",
-        evidence=score_autogen["evidence"],
-        evaluated_by="demo_user",
-    ))
+    eval_repo.create(
+        Evaluation(
+            project_id=autogen.id,
+            relevance_score=score_autogen["relevance_score"],
+            trialability_score=score_autogen["trialability_score"],
+            value_score=score_autogen["value_score"],
+            recommendation_score=score_autogen["recommendation_score"],
+            decision="watch",
+            decision_reason="Interesting but complex, keep watching",
+            evidence=score_autogen["evidence"],
+            evaluated_by="demo_user",
+        )
+    )
     autogen = project_repo.get(autogen.id)
     print(f"  Created evaluation for {autogen.name} (decision=watch)")
 
     # ── 3. Create 2 trials ───────────────────────────────────────────
     # Trial 1: crewAI -> claimed -> running -> demo_done
-    trial1 = trial_repo.create(Trial(
-        project_id=crewai.id,
-        owner="alice",
-        status="demo_done",
-        due_date=date.today() + timedelta(days=14),
-        environment="Python 3.11 + conda",
-        demo_url="https://demo.example.com/crewai",
-        trial_notes="Tested multi-agent collaboration with 3 agents",
-        result_summary="CrewAI provides intuitive agent orchestration, good for structured tasks",
-        next_action="Prepare share for team meeting",
-    ))
+    trial1 = trial_repo.create(
+        Trial(
+            project_id=crewai.id,
+            owner="alice",
+            status="demo_done",
+            due_date=date.today() + timedelta(days=14),
+            environment="Python 3.11 + conda",
+            demo_url="https://demo.example.com/crewai",
+            trial_notes="Tested multi-agent collaboration with 3 agents",
+            result_summary="CrewAI provides intuitive agent orchestration, good for structured tasks",
+            next_action="Prepare share for team meeting",
+        )
+    )
     print(f"  Created trial for {crewai.name} (status=demo_done)")
 
     # Trial 2: SGLang (index 7) -> claimed -> running
     sglang = created_projects[7]
-    trial_repo.create(Trial(
-        project_id=sglang.id,
-        owner="bob",
-        status="running",
-        due_date=date.today() + timedelta(days=7),
-        environment="Docker + A100 GPU",
-        trial_notes="Benchmarking inference throughput vs vLLM",
-    ))
+    trial_repo.create(
+        Trial(
+            project_id=sglang.id,
+            owner="bob",
+            status="running",
+            due_date=date.today() + timedelta(days=7),
+            environment="Docker + A100 GPU",
+            trial_notes="Benchmarking inference throughput vs vLLM",
+        )
+    )
     print(f"  Created trial for {sglang.name} (status=running)")
 
     # ── 4. Create 1 share from trial1 ────────────────────────────────
-    share1 = share_repo.create(Share(
-        trial_id=trial1.id,
-        title="CrewAI Multi-Agent 试用分享",
-        summary="CrewAI is an effective framework for orchestrating role-playing AI agents with clear abstractions.",
-        key_findings="1. Agent definition via YAML config is intuitive\n2. Built-in memory and tool integration\n3. Supports sequential and hierarchical processes",
-        reusable_patterns="Agent role template pattern; Tool callback pattern; Memory backends",
-        applicable_scenarios="Structured multi-step tasks; Customer support automation; Data analysis pipelines",
-        shared_by="alice",
-    ))
+    share1 = share_repo.create(
+        Share(
+            trial_id=trial1.id,
+            title="CrewAI Multi-Agent 试用分享",
+            summary="CrewAI is an effective framework for orchestrating role-playing AI agents with clear abstractions.",
+            key_findings="1. Agent definition via YAML config is intuitive\n2. Built-in memory and tool integration\n3. Supports sequential and hierarchical processes",
+            reusable_patterns="Agent role template pattern; Tool callback pattern; Memory backends",
+            applicable_scenarios="Structured multi-step tasks; Customer support automation; Data analysis pipelines",
+            shared_by="alice",
+        )
+    )
     # Update trial status to shared
     trial1.status = "shared"
     trial_repo.update(trial1)
@@ -476,6 +486,7 @@ def main() -> None:
     SQLModel.metadata.create_all(engine)
 
     from sqlmodel import Session
+
     with Session(engine) as session:
         print("Seeding demo data...")
         summary = seed(session)

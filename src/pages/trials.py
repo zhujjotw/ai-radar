@@ -51,13 +51,9 @@ with tab_claims:
     else:
         for project in try_projects:
             existing_trials = _trial_repo.list_by_project(project.id) if project.id else []
-            has_active_trial = any(
-                t.status not in ("dropped", "shared") for t in existing_trials
-            )
+            has_active_trial = any(t.status not in ("dropped", "shared") for t in existing_trials)
 
-            eval_data = (
-                _evaluation_repo.get_latest_by_project(project.id) if project.id else None
-            )
+            eval_data = _evaluation_repo.get_latest_by_project(project.id) if project.id else None
 
             header = f"**{project.name}** ⭐{project.stars}"
             if eval_data and eval_data.recommendation_score:
@@ -183,7 +179,9 @@ with tab_active:
                     "dropped": ["claimed"],
                 }
                 next_statuses = allowed_next.get(trial.status, [])
-                current_idx = VALID_STATUSES.index(trial.status) if trial.status in VALID_STATUSES else 0
+                current_idx = (
+                    VALID_STATUSES.index(trial.status) if trial.status in VALID_STATUSES else 0
+                )
 
                 if next_statuses:
                     new_status = st.selectbox(
@@ -224,8 +222,7 @@ with tab_active:
                                 trial.blockers = blockers_input.strip() or None
                             if drop_reason is not None:
                                 trial.trial_notes = (
-                                    (trial.trial_notes or "")
-                                    + f"\n[Dropped: {drop_reason}]"
+                                    (trial.trial_notes or "") + f"\n[Dropped: {drop_reason}]"
                                 ).strip()
                             _trial_repo.update(trial)
                             st.success(f"Status updated to **{new_status}**")

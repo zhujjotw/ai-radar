@@ -110,4 +110,3 @@ class GraphEdge(SQLModel, table=True):
     source: str = Field(default="manual", index=True)
     created_by: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
-

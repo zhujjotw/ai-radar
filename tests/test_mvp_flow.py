@@ -101,51 +101,61 @@ class TestMVPLifecycle:
 
         # ── Step 1: Seed projects ─────────────────────────────────────
         # 3 baseline + 2 candidate (one filtered out by low stars)
-        p1 = project_repo.upsert(_make_project(
-            repo_full_name="org/langchain",
-            name="LangChain",
-            pool="baseline",
-            source="baseline",
-            stars=95000,
-            tags=["Agent", "RAG", "Workflow"],
-            topics=["llm", "agent", "rag", "chains"],
-        ))
-        p2 = project_repo.upsert(_make_project(
-            repo_full_name="org/openai-sdk",
-            name="OpenAI SDK",
-            pool="baseline",
-            source="baseline",
-            stars=25000,
-            tags=["Inference"],
-            topics=["openai", "llm", "api"],
-        ))
-        p3 = project_repo.upsert(_make_project(
-            repo_full_name="org/crewai",
-            name="crewAI",
-            pool="candidate",
-            source="github_search",
-            stars=22000,
-            tags=["Agent"],
-            topics=["agent", "multi-agent"],
-        ))
-        p4 = project_repo.upsert(_make_project(
-            repo_full_name="org/sglang",
-            name="SGLang",
-            pool="candidate",
-            source="github_search",
-            stars=8000,
-            tags=["Inference"],
-            topics=["inference", "llm"],
-        ))
-        p5 = project_repo.upsert(_make_project(
-            repo_full_name="org/tiny-agent",
-            name="TinyAgent",
-            pool="candidate",
-            source="github_search",
-            stars=30,  # below threshold
-            tags=["Agent"],
-            topics=["agent"],
-        ))
+        p1 = project_repo.upsert(
+            _make_project(
+                repo_full_name="org/langchain",
+                name="LangChain",
+                pool="baseline",
+                source="baseline",
+                stars=95000,
+                tags=["Agent", "RAG", "Workflow"],
+                topics=["llm", "agent", "rag", "chains"],
+            )
+        )
+        p2 = project_repo.upsert(
+            _make_project(
+                repo_full_name="org/openai-sdk",
+                name="OpenAI SDK",
+                pool="baseline",
+                source="baseline",
+                stars=25000,
+                tags=["Inference"],
+                topics=["openai", "llm", "api"],
+            )
+        )
+        p3 = project_repo.upsert(
+            _make_project(
+                repo_full_name="org/crewai",
+                name="crewAI",
+                pool="candidate",
+                source="github_search",
+                stars=22000,
+                tags=["Agent"],
+                topics=["agent", "multi-agent"],
+            )
+        )
+        p4 = project_repo.upsert(
+            _make_project(
+                repo_full_name="org/sglang",
+                name="SGLang",
+                pool="candidate",
+                source="github_search",
+                stars=8000,
+                tags=["Inference"],
+                topics=["inference", "llm"],
+            )
+        )
+        p5 = project_repo.upsert(
+            _make_project(
+                repo_full_name="org/tiny-agent",
+                name="TinyAgent",
+                pool="candidate",
+                source="github_search",
+                stars=30,  # below threshold
+                tags=["Agent"],
+                topics=["agent"],
+            )
+        )
 
         assert project_repo.get(p1.id) is not None
         assert project_repo.get(p5.id) is not None
@@ -190,17 +200,19 @@ class TestMVPLifecycle:
         assert score_p3["relevance_score"] >= 1
 
         # ── Step 4: Create evaluation ─────────────────────────────────
-        ev1 = eval_repo.create(Evaluation(
-            project_id=p3.id,
-            relevance_score=score_p3["relevance_score"],
-            trialability_score=score_p3["trialability_score"],
-            value_score=score_p3["value_score"],
-            recommendation_score=score_p3["recommendation_score"],
-            decision="try",
-            decision_reason="Active multi-agent framework",
-            evidence=score_p3["evidence"],
-            evaluated_by="tester",
-        ))
+        ev1 = eval_repo.create(
+            Evaluation(
+                project_id=p3.id,
+                relevance_score=score_p3["relevance_score"],
+                trialability_score=score_p3["trialability_score"],
+                value_score=score_p3["value_score"],
+                recommendation_score=score_p3["recommendation_score"],
+                decision="try",
+                decision_reason="Active multi-agent framework",
+                evidence=score_p3["evidence"],
+                evaluated_by="tester",
+            )
+        )
         assert ev1.id is not None
         assert ev1.decision == "try"
 
@@ -209,12 +221,14 @@ class TestMVPLifecycle:
         assert ev_latest.decision == "try"
 
         # ── Step 5: Create trial + status transitions ─────────────────
-        trial1 = trial_repo.create(Trial(
-            project_id=p3.id,
-            owner="alice",
-            status="claimed",
-            due_date=date.today() + timedelta(days=14),
-        ))
+        trial1 = trial_repo.create(
+            Trial(
+                project_id=p3.id,
+                owner="alice",
+                status="claimed",
+                due_date=date.today() + timedelta(days=14),
+            )
+        )
         assert trial1.status == "claimed"
 
         # claimed -> running
@@ -231,13 +245,15 @@ class TestMVPLifecycle:
         assert trial_repo.get(trial1.id).status == "demo_done"
 
         # Create second trial (running state)
-        trial2 = trial_repo.create(Trial(
-            project_id=p4.id,
-            owner="bob",
-            status="running",
-            due_date=date.today() + timedelta(days=7),
-            environment="Docker + A100",
-        ))
+        trial2 = trial_repo.create(
+            Trial(
+                project_id=p4.id,
+                owner="bob",
+                status="running",
+                due_date=date.today() + timedelta(days=7),
+                environment="Docker + A100",
+            )
+        )
         assert trial_repo.list_by_owner("bob")[0].id == trial2.id
 
         # ── Step 6: Build graph + create share ────────────────────────
@@ -253,15 +269,17 @@ class TestMVPLifecycle:
         add_similar_to(session, p1, p3, evidence="Both are agent frameworks")
 
         # Create share from trial1
-        share1 = share_repo.create(Share(
-            trial_id=trial1.id,
-            title="CrewAI 试用分享",
-            summary="CrewAI is effective for multi-agent orchestration.",
-            key_findings="1. Intuitive YAML config\n2. Built-in tool integration",
-            reusable_patterns="Agent role template pattern",
-            applicable_scenarios="Structured multi-step tasks",
-            shared_by="alice",
-        ))
+        share1 = share_repo.create(
+            Share(
+                trial_id=trial1.id,
+                title="CrewAI 试用分享",
+                summary="CrewAI is effective for multi-agent orchestration.",
+                key_findings="1. Intuitive YAML config\n2. Built-in tool integration",
+                reusable_patterns="Agent role template pattern",
+                applicable_scenarios="Structured multi-step tasks",
+                shared_by="alice",
+            )
+        )
         assert share1.id is not None
 
         # Update trial status to shared

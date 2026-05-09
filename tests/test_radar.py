@@ -81,33 +81,39 @@ class TestProjectRepositoryUpdate:
 
 class TestProjectRepositoryListWithOptions:
     def _seed_projects(self, project_repo):
-        project_repo.upsert(_make_project(
-            repo_full_name="org/agent-proj",
-            name="Agent Project",
-            pool="baseline",
-            source="baseline",
-            stars=1000,
-            tags=["Agent", "RAG"],
-            filter_status="needs_review",
-        ))
-        project_repo.upsert(_make_project(
-            repo_full_name="org/rag-proj",
-            name="RAG Project",
-            pool="candidate",
-            source="github_search",
-            stars=200,
-            tags=["RAG"],
-            filter_status="passed",
-        ))
-        project_repo.upsert(_make_project(
-            repo_full_name="org/infra-proj",
-            name="Infra Project",
-            pool="candidate",
-            source="manual",
-            stars=50,
-            tags=["Inference"],
-            filter_status="filtered_out",
-        ))
+        project_repo.upsert(
+            _make_project(
+                repo_full_name="org/agent-proj",
+                name="Agent Project",
+                pool="baseline",
+                source="baseline",
+                stars=1000,
+                tags=["Agent", "RAG"],
+                filter_status="needs_review",
+            )
+        )
+        project_repo.upsert(
+            _make_project(
+                repo_full_name="org/rag-proj",
+                name="RAG Project",
+                pool="candidate",
+                source="github_search",
+                stars=200,
+                tags=["RAG"],
+                filter_status="passed",
+            )
+        )
+        project_repo.upsert(
+            _make_project(
+                repo_full_name="org/infra-proj",
+                name="Infra Project",
+                pool="candidate",
+                source="manual",
+                stars=50,
+                tags=["Inference"],
+                filter_status="filtered_out",
+            )
+        )
 
     def test_list_all(self, project_repo):
         self._seed_projects(project_repo)
@@ -175,15 +181,24 @@ class TestProjectRepositoryListWithOptions:
 
 class TestProjectRepositoryGetAllTags:
     def test_returns_sorted_unique_tags(self, project_repo):
-        project_repo.upsert(_make_project(
-            repo_full_name="a/b", tags=["Agent", "RAG"],
-        ))
-        project_repo.upsert(_make_project(
-            repo_full_name="c/d", tags=["RAG", "Inference"],
-        ))
-        project_repo.upsert(_make_project(
-            repo_full_name="e/f", tags=[],
-        ))
+        project_repo.upsert(
+            _make_project(
+                repo_full_name="a/b",
+                tags=["Agent", "RAG"],
+            )
+        )
+        project_repo.upsert(
+            _make_project(
+                repo_full_name="c/d",
+                tags=["RAG", "Inference"],
+            )
+        )
+        project_repo.upsert(
+            _make_project(
+                repo_full_name="e/f",
+                tags=[],
+            )
+        )
         tags = project_repo.get_all_tags()
         assert tags == ["Agent", "Inference", "RAG"]
 
@@ -203,11 +218,13 @@ class TestEvaluationRepositoryGetLatest:
 
     def test_returns_evaluation_when_one(self, evaluation_repo, project_repo):
         project = project_repo.upsert(_make_project())
-        evaluation_repo.create(Evaluation(
-            project_id=project.id,
-            decision="watch",
-            recommendation_score=7,
-        ))
+        evaluation_repo.create(
+            Evaluation(
+                project_id=project.id,
+                decision="watch",
+                recommendation_score=7,
+            )
+        )
         result = evaluation_repo.get_latest_by_project(project.id)
         assert result is not None
         assert result.decision == "watch"
@@ -215,16 +232,20 @@ class TestEvaluationRepositoryGetLatest:
 
     def test_returns_latest_when_multiple(self, evaluation_repo, project_repo):
         project = project_repo.upsert(_make_project())
-        evaluation_repo.create(Evaluation(
-            project_id=project.id,
-            decision="watch",
-            recommendation_score=5,
-        ))
-        evaluation_repo.create(Evaluation(
-            project_id=project.id,
-            decision="try",
-            recommendation_score=8,
-        ))
+        evaluation_repo.create(
+            Evaluation(
+                project_id=project.id,
+                decision="watch",
+                recommendation_score=5,
+            )
+        )
+        evaluation_repo.create(
+            Evaluation(
+                project_id=project.id,
+                decision="try",
+                recommendation_score=8,
+            )
+        )
         result = evaluation_repo.get_latest_by_project(project.id)
         assert result is not None
         assert result.decision == "try"
@@ -237,10 +258,12 @@ class TestEvaluationRepositoryGetLatest:
 class TestEvaluationRepositoryUpdate:
     def test_update_decision(self, evaluation_repo, project_repo):
         project = project_repo.upsert(_make_project())
-        ev = evaluation_repo.create(Evaluation(
-            project_id=project.id,
-            decision="watch",
-        ))
+        ev = evaluation_repo.create(
+            Evaluation(
+                project_id=project.id,
+                decision="watch",
+            )
+        )
         ev.decision = "try"
         ev.decision_reason = "Looks promising"
         updated = evaluation_repo.update(ev)
@@ -249,10 +272,12 @@ class TestEvaluationRepositoryUpdate:
 
     def test_update_preserves_id(self, evaluation_repo, project_repo):
         project = project_repo.upsert(_make_project())
-        ev = evaluation_repo.create(Evaluation(
-            project_id=project.id,
-            decision="watch",
-        ))
+        ev = evaluation_repo.create(
+            Evaluation(
+                project_id=project.id,
+                decision="watch",
+            )
+        )
         original_id = ev.id
         ev.recommendation_score = 9
         updated = evaluation_repo.update(ev)
@@ -281,10 +306,12 @@ class TestRadarFlowIntegration:
 
     def test_update_existing_decision(self, project_repo, evaluation_repo):
         project = project_repo.upsert(_make_project())
-        ev = evaluation_repo.create(Evaluation(
-            project_id=project.id,
-            decision="watch",
-        ))
+        ev = evaluation_repo.create(
+            Evaluation(
+                project_id=project.id,
+                decision="watch",
+            )
+        )
         ev.decision = "reject"
         ev.decision_reason = "Not a good fit"
         evaluation_repo.update(ev)
@@ -293,10 +320,12 @@ class TestRadarFlowIntegration:
         assert latest.decision == "reject"
 
     def test_override_filter_status(self, project_repo):
-        project = project_repo.upsert(_make_project(
-            filter_status="filtered_out",
-            filter_reason="Stars 50 below threshold 200",
-        ))
+        project = project_repo.upsert(
+            _make_project(
+                filter_status="filtered_out",
+                filter_reason="Stars 50 below threshold 200",
+            )
+        )
         assert project.filter_status == "filtered_out"
 
         # Override
@@ -306,10 +335,12 @@ class TestRadarFlowIntegration:
         assert updated.filter_status == "override"
 
     def test_remove_override(self, project_repo):
-        project = project_repo.upsert(_make_project(
-            filter_status="override",
-            filter_reason="Manual override",
-        ))
+        project = project_repo.upsert(
+            _make_project(
+                filter_status="override",
+                filter_reason="Manual override",
+            )
+        )
         project.filter_status = "needs_review"
         project.filter_reason = None
         updated = project_repo.update(project)
@@ -317,12 +348,18 @@ class TestRadarFlowIntegration:
         assert updated.filter_reason is None
 
     def test_filter_by_decision_joins_evaluation(self, project_repo, evaluation_repo):
-        p1 = project_repo.upsert(_make_project(
-            repo_full_name="a/watched", name="Watched Project",
-        ))
-        p2 = project_repo.upsert(_make_project(
-            repo_full_name="a/tried", name="Tried Project",
-        ))
+        p1 = project_repo.upsert(
+            _make_project(
+                repo_full_name="a/watched",
+                name="Watched Project",
+            )
+        )
+        p2 = project_repo.upsert(
+            _make_project(
+                repo_full_name="a/tried",
+                name="Tried Project",
+            )
+        )
         evaluation_repo.create(Evaluation(project_id=p1.id, decision="watch"))
         evaluation_repo.create(Evaluation(project_id=p2.id, decision="try"))
 

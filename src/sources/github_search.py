@@ -187,7 +187,9 @@ def search_candidate_projects(
                 summary = _fetch_readme_summary(full_name, token=token)
                 if summary:
                     project.readme_summary = summary
-                    project.has_quickstart = "quickstart" in summary.lower() or "getting started" in summary.lower()
+                    project.has_quickstart = (
+                        "quickstart" in summary.lower() or "getting started" in summary.lower()
+                    )
 
             projects.append(project)
 
@@ -231,8 +233,12 @@ def refresh_project_metadata(
     project.open_issues = data.get("open_issues_count", project.open_issues)
     project.language = data.get("language", project.language)
     project.topics = data.get("topics", project.topics)
-    project.license = data.get("license", {}).get("spdx_id") if data.get("license") else project.license
+    project.license = (
+        data.get("license", {}).get("spdx_id") if data.get("license") else project.license
+    )
     project.last_pushed_at = data.get("pushed_at", project.last_pushed_at)
-    project.last_checked_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    project.last_checked_at = __import__("datetime").datetime.now(
+        __import__("datetime").timezone.utc
+    )
 
     return project

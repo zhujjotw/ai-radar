@@ -162,8 +162,10 @@ def run_smoke_test() -> None:
         agent_projects = find_projects_by_domain(session, "Agent")
         agent_names = {p.name for p in agent_projects}
         check("Agent domain returns projects", len(agent_projects) > 0)
-        check("LangChain or crewAI in Agent domain",
-              "LangChain" in agent_names or "crewAI" in agent_names)
+        check(
+            "LangChain or crewAI in Agent domain",
+            "LangChain" in agent_names or "crewAI" in agent_names,
+        )
 
         dep_projects = find_projects_by_dependency(session, "openai-python")
         dep_names = {p.name for p in dep_projects}
@@ -174,9 +176,9 @@ def run_smoke_test() -> None:
         check("multi-agent capability returns crewAI", "crewAI" in cap_names)
 
     # ── Summary ────────────────────────────────────────────────────────
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Smoke test: {passed} passed, {failed} failed")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     if failed > 0:
         sys.exit(1)
 
