@@ -276,3 +276,10 @@ class GraphRepository:
         project_statement = select(Project).where(Project.id.in_(project_ids))
         return self.session.exec(project_statement).all()
 
+    def list_node_names_by_type(self, node_type: str) -> list[str]:
+        """Return distinct node names for a given node_type, sorted alphabetically."""
+        from sqlalchemy import distinct
+
+        statement = select(distinct(GraphNode.name)).where(GraphNode.node_type == node_type)
+        return sorted(self.session.exec(statement).all())
+
