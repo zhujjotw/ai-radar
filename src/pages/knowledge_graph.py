@@ -11,54 +11,64 @@ from streamlit_agraph import Node as AgraphNode
 from src.db import get_session, init_db
 from src.repositories import ProjectRepository
 
-# --- Database setup ---
-init_db()
-_session = get_session()
-_project_repo = ProjectRepository(_session)
 
-# --- Page header ---
-st.title("Knowledge Graph")
-st.caption("基于 GitHub Topics 的项目知识图谱")
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def _load_projects():
+    """Load projects from database with caching."""
+    init_db()
+    session = get_session()
+    repo = ProjectRepository(session)
+    projects = repo.list_with_options()
+    # Convert to dict to make it hashable for caching
+    return [
+        {
+            "id": p.id,
+            "name": p.name,
+            "github_url": p.github_url,
+            "stars": p.stars,
+            "forks": p.forks,
+            "language": p.language,
+            "pool": p.pool,
+            "source": p.source,
+            "last_pushed_at": p.last_pushed_at.strftime("%Y-%m-%d") if p.last_pushed_at else None,
+            "description": p.description,
+            "tags": p.tags or [],
+            "topics": p.topics or [],
+            "llm_description": p.llm_description,
+            "llm_scenarios": p.llm_scenarios,
+        }
+        for p in projects
+    ]
 
-# --- Load all projects ---
-all_projects = _project_repo.list_with_options()
 
-if not all_projects:
-    st.info("没有找到项目。请先导入项目。")
-else:
-    # --- Build graph data from project topics ---
+def _build_graph(projects_data):
+    """Build graph nodes and edges from project data."""
     nodes: list[AgraphNode] = []
     edges: list[AgraphEdge] = []
 
-    # Track unique topics and projects
     topic_nodes: dict[str, AgraphNode] = {}
     project_nodes: dict[int, AgraphNode] = {}
 
-    # Colors for different node types
-    PROJECT_COLOR = "#4e79a7"  # Blue
-    TOPIC_COLOR = "#f28e2b"  # Orange
+    PROJECT_COLOR = "#4e79a7"
+    TOPIC_COLOR = "#f28e2b"
 
-    # Build nodes and edges
-    for project in all_projects:
-        if not project.id:
+    for p in projects_data:
+        project_id = p["id"]
+        if not project_id:
             continue
 
-        # Create project node
         project_node = AgraphNode(
-            id=f"project_{project.id}",
-            label=project.name,
-            title=f"Project: {project.name}\nStars: {project.stars}\nLanguage: {project.language or '-'}",
+            id=f"project_{project_id}",
+            label=p["name"],
+            title=f"Project: {p['name']}\nStars: {p['stars']}\nLanguage: {p['language'] or '-'}",
             color=PROJECT_COLOR,
             size=25,
             shape="dot",
         )
-        project_nodes[project.id] = project_node
+        project_nodes[project_id] = project_node
         nodes.append(project_node)
 
-        # Create topic nodes and edges
-        topics = project.topics or []
-        for topic in topics:
-            # Create topic node if not exists
+        for topic in p["topics"]:
             if topic not in topic_nodes:
                 topic_node = AgraphNode(
                     id=f"topic_{topic}",
@@ -71,19 +81,33 @@ else:
                 topic_nodes[topic] = topic_node
                 nodes.append(topic_node)
 
-            # Create edge from project to topic
             edge = AgraphEdge(
-                source=f"project_{project.id}",
+                source=f"project_{project_id}",
                 target=f"topic_{topic}",
                 color="#cccccc",
-                title=f"{project.name} → {topic}",
+                title=f"{p['name']} → {topic}",
             )
             edges.append(edge)
+
+    return nodes, edges, project_nodes, topic_nodes
+
+
+# --- Page header ---
+st.title("Knowledge Graph")
+st.caption("基于 GitHub Topics 的项目知识图谱")
+
+# --- Load all projects (cached) ---
+all_projects = _load_projects()
+
+if not all_projects:
+    st.info("没有找到项目。请先导入项目。")
+else:
+    # --- Build graph data ---
+    nodes, edges, project_nodes, topic_nodes = _build_graph(all_projects)
 
     # --- Display graph ---
     st.subheader(f"项目-Topic 图谱 (共 {len(project_nodes)} 个项目, {len(topic_nodes)} 个 Topic)")
 
-    # Graph configuration
     config = AgraphConfig(
         width=1400,
         height=800,
@@ -94,7 +118,6 @@ else:
         solver="forceAtlas2Based",
     )
 
-    # Render graph
     agraph(nodes=nodes, edges=edges, config=config)
 
     # --- Statistics ---
@@ -113,19 +136,16 @@ else:
     st.divider()
     st.subheader("Topic 分布")
 
-    # Count projects per topic
     topic_counts: dict[str, int] = {}
-    for project in all_projects:
-        for topic in project.topics or []:
+    for p in all_projects:
+        for topic in p["topics"]:
             topic_counts[topic] = topic_counts.get(topic, 0) + 1
 
-    # Sort by count
     sorted_topics = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)
 
-    # Display as bar chart
     if sorted_topics:
         chart_data = {
-            "Topic": [t[0] for t in sorted_topics[:20]],  # Top 20
+            "Topic": [t[0] for t in sorted_topics[:20]],
             "项目数量": [t[1] for t in sorted_topics[:20]],
         }
         st.bar_chart(chart_data, x="Topic", y="项目数量")
@@ -136,7 +156,6 @@ else:
     st.divider()
     st.subheader("项目详情")
 
-    # Filter by topic
     all_topics = sorted(topic_counts.keys())
     selected_topic = st.selectbox(
         "按 Topic 筛选",
@@ -144,38 +163,36 @@ else:
         key="kg_topic_filter",
     )
 
-    # Filter projects
     if selected_topic == "所有 Topic":
         filtered_projects = all_projects
     else:
-        filtered_projects = [p for p in all_projects if selected_topic in (p.topics or [])]
+        filtered_projects = [p for p in all_projects if selected_topic in p["topics"]]
 
-    # Display projects
-    for project in filtered_projects:
-        with st.expander(f"**{project.name}** — ⭐{project.stars}"):
+    for p in filtered_projects:
+        with st.expander(f"**{p['name']}** — ⭐{p['stars']}"):
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.markdown(f"**Stars:** {project.stars:,}")
-                st.markdown(f"**Forks:** {project.forks:,}")
-                st.markdown(f"**Language:** {project.language or '-'}")
+                st.markdown(f"**Stars:** {p['stars']:,}")
+                st.markdown(f"**Forks:** {p['forks']:,}")
+                st.markdown(f"**Language:** {p['language'] or '-'}")
             with col2:
-                st.markdown(f"**Pool:** {project.pool}")
-                st.markdown(f"**Source:** {project.source}")
-                if project.last_pushed_at:
-                    st.markdown(f"**Last Push:** {project.last_pushed_at.strftime('%Y-%m-%d')}")
+                st.markdown(f"**Pool:** {p['pool']}")
+                st.markdown(f"**Source:** {p['source']}")
+                if p["last_pushed_at"]:
+                    st.markdown(f"**Last Push:** {p['last_pushed_at']}")
             with col3:
-                st.markdown(f"[GitHub]({project.github_url})")
-                if project.tags:
-                    st.markdown("**Tags:** " + " · ".join(project.tags))
+                st.markdown(f"[GitHub]({p['github_url']})")
+                if p["tags"]:
+                    st.markdown("**Tags:** " + " · ".join(p["tags"]))
 
-            if project.description:
-                st.markdown(f"> {project.description}")
+            if p["description"]:
+                st.markdown(f"> {p['description']}")
 
-            if project.topics:
-                st.markdown("**Topics:** " + " · ".join(project.topics))
+            if p["topics"]:
+                st.markdown("**Topics:** " + " · ".join(p["topics"]))
 
-            if project.llm_description:
+            if p["llm_description"]:
                 st.divider()
-                st.markdown(f"**项目描述:** {project.llm_description}")
-                if project.llm_scenarios:
-                    st.markdown(f"**适用场景:**\n{project.llm_scenarios}")
+                st.markdown(f"**项目描述:** {p['llm_description']}")
+                if p["llm_scenarios"]:
+                    st.markdown(f"**适用场景:**\n{p['llm_scenarios']}")
