@@ -23,7 +23,7 @@ async function handleSave() {
   loading.value = true
   try {
     await api.put('/settings', form.value)
-    ElMessage.success('配置已保存，下次启动生效')
+    ElMessage.success('Settings saved. Restart to apply.')
     loadSettings()
   } finally {
     loading.value = false

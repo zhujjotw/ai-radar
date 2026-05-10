@@ -22,27 +22,27 @@ const statusColors: Record<string, string> = {
 
 // Primary action per status
 const primaryActions: Record<string, { label: string; target: string; type: string }> = {
-  claimed: { label: '开始试用', target: 'running', type: 'primary' },
-  running: { label: 'Demo 完成', target: 'demo_done', type: 'success' },
-  blocked: { label: '恢复试用', target: 'running', type: 'primary' },
-  demo_done: { label: '分享', target: 'shared', type: 'primary' },
-  dropped: { label: '重新认领', target: 'claimed', type: 'primary' },
+  claimed: { label: 'Start Trial', target: 'running', type: 'primary' },
+  running: { label: 'Demo Done', target: 'demo_done', type: 'success' },
+  blocked: { label: 'Resume', target: 'running', type: 'primary' },
+  demo_done: { label: 'Share', target: 'shared', type: 'primary' },
+  dropped: { label: 'Reclaim', target: 'claimed', type: 'primary' },
 }
 
 // Secondary actions per status (shown in dropdown)
 const secondaryActions: Record<string, { label: string; target: string; needsDialog: boolean }[]> = {
   claimed: [
-    { label: '放弃', target: 'dropped', needsDialog: true },
+    { label: 'Drop', target: 'dropped', needsDialog: true },
   ],
   running: [
-    { label: '标记阻塞', target: 'blocked', needsDialog: true },
-    { label: '放弃', target: 'dropped', needsDialog: true },
+    { label: 'Mark Blocked', target: 'blocked', needsDialog: true },
+    { label: 'Drop', target: 'dropped', needsDialog: true },
   ],
   blocked: [
-    { label: '放弃', target: 'dropped', needsDialog: true },
+    { label: 'Drop', target: 'dropped', needsDialog: true },
   ],
   demo_done: [
-    { label: '放弃', target: 'dropped', needsDialog: true },
+    { label: 'Drop', target: 'dropped', needsDialog: true },
   ],
   dropped: [],
   shared: [],
@@ -113,12 +113,12 @@ async function handlePrimary(row: { id: number; status: string; project_name: st
 
   try {
     await ElMessageBox.confirm(
-      `确认将 "${row.project_name}" 状态从 ${row.status} 改为 ${action.target}?`,
+      `Change "${row.project_name}" from ${row.status} to ${action.target}?`,
       action.label,
-      { type: 'info', confirmButtonText: '确认', cancelButtonText: '取消' },
+      { type: 'info', confirmButtonText: 'Confirm', cancelButtonText: 'Cancel' },
     )
     await store.transitionTrial(row.id, { target_status: action.target })
-    ElMessage.success(`状态已更新为 ${action.target}`)
+    ElMessage.success(`Status updated to ${action.target}`)
   } catch {
     // cancelled or error
   }
@@ -136,18 +136,18 @@ function openDialog(trialId: number, targetStatus: string, projectName: string |
 
   const fields: { label: string; key: string; placeholder: string; required: boolean }[] = []
   const titleMap: Record<string, string> = {
-    blocked: '标记阻塞',
-    demo_done: 'Demo 完成',
-    dropped: '放弃试用',
+    blocked: 'Mark Blocked',
+    demo_done: 'Demo Done',
+    dropped: 'Drop Trial',
   }
   dialogTitle.value = `${titleMap[targetStatus] || targetStatus} — ${projectName || ''}`
 
   if (targetStatus === 'blocked') {
-    fields.push({ label: '阻塞原因', key: 'blockers', placeholder: '描述阻塞原因（必填）', required: true })
+    fields.push({ label: 'Blocker', key: 'blockers', placeholder: 'Describe the blocker (required)', required: true })
   } else if (targetStatus === 'demo_done') {
-    fields.push({ label: '结果摘要', key: 'result_summary', placeholder: '描述试用结果和结论（必填）', required: true })
+    fields.push({ label: 'Result Summary', key: 'result_summary', placeholder: 'Summarize the trial result (required)', required: true })
   } else if (targetStatus === 'dropped') {
-    fields.push({ label: '放弃原因', key: 'drop_reason', placeholder: '可选：为什么放弃', required: false })
+    fields.push({ label: 'Drop Reason', key: 'drop_reason', placeholder: 'Why drop this trial? (optional)', required: false })
   }
 
   dialogFields.value = fields
@@ -159,7 +159,7 @@ async function handleDialogConfirm() {
   // Validate required fields
   for (const f of dialogFields.value) {
     if (f.required && !d[f.key as keyof typeof d]?.trim()) {
-      ElMessage.warning(`请填写${f.label}`)
+      ElMessage.warning(`Please fill in ${f.label}`)
       return
     }
   }
@@ -172,7 +172,7 @@ async function handleDialogConfirm() {
       result_summary: d.result_summary || undefined,
       drop_reason: d.drop_reason || undefined,
     })
-    ElMessage.success(`状态已更新为 ${d.targetStatus}`)
+    ElMessage.success(`Status updated to ${d.targetStatus}`)
     dialogVisible.value = false
   } finally {
     dialogLoading.value = false
@@ -191,7 +191,7 @@ async function handleSaveDetail(trialId: number) {
       result_summary: fields.result_summary || null,
       next_action: fields.next_action || null,
     })
-    ElMessage.success('已保存')
+    ElMessage.success('Saved')
   } catch {
     // handled by interceptor
   }
@@ -245,27 +245,27 @@ onMounted(async () => {
                 </el-col>
                 <el-col :span="12">
                   <el-form-item label="Environment">
-                    <el-input v-model="expandedFields[row.id].environment" placeholder="试用环境" />
+                    <el-input v-model="expandedFields[row.id].environment" placeholder="Trial environment" />
                   </el-form-item>
                 </el-col>
               </el-row>
               <el-row :gutter="16">
                 <el-col :span="12">
                   <el-form-item label="Demo URL">
-                    <el-input v-model="expandedFields[row.id].demo_url" placeholder="演示链接" />
+                    <el-input v-model="expandedFields[row.id].demo_url" placeholder="Demo URL" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
                   <el-form-item label="Next Action">
-                    <el-input v-model="expandedFields[row.id].next_action" placeholder="下一步行动" />
+                    <el-input v-model="expandedFields[row.id].next_action" placeholder="Next action" />
                   </el-form-item>
                 </el-col>
               </el-row>
               <el-form-item label="Notes">
-                <el-input v-model="expandedFields[row.id].trial_notes" type="textarea" :rows="2" placeholder="试用笔记" />
+                <el-input v-model="expandedFields[row.id].trial_notes" type="textarea" :rows="2" placeholder="Trial notes" />
               </el-form-item>
               <el-form-item label="Result">
-                <el-input v-model="expandedFields[row.id].result_summary" type="textarea" :rows="2" placeholder="试用结论" />
+                <el-input v-model="expandedFields[row.id].result_summary" type="textarea" :rows="2" placeholder="Result summary" />
               </el-form-item>
               <el-form-item>
                 <el-button type="primary" size="small" @click="handleSaveDetail(row.id)">Save Details</el-button>
@@ -322,7 +322,7 @@ onMounted(async () => {
               </template>
             </el-dropdown>
           </div>
-          <el-tag v-else-if="row.status === 'shared'" type="success" size="small">已完成</el-tag>
+          <el-tag v-else-if="row.status === 'shared'" type="success" size="small">Done</el-tag>
         </template>
       </el-table-column>
     </el-table>
@@ -345,8 +345,8 @@ onMounted(async () => {
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="dialogLoading" @click="handleDialogConfirm">确认</el-button>
+        <el-button @click="dialogVisible = false">Cancel</el-button>
+        <el-button type="primary" :loading="dialogLoading" @click="handleDialogConfirm">Confirm</el-button>
       </template>
     </el-dialog>
   </div>

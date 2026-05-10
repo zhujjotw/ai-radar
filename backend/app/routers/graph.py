@@ -12,32 +12,15 @@ from app.repositories import ProjectRepository
 router = APIRouter()
 
 
-class GraphNodeOut(BaseModel):
-    id: str
-    label: str
-    group: str
-    title: str
-    color: str
-    size: int
-    shape: str
-
-
-class GraphEdgeOut(BaseModel):
-    from_: str
-    to: str
-    label: str
-    color: str = "#cccccc"
-
-
 class TopicGraphResponse(BaseModel):
-    nodes: list[GraphNodeOut]
-    edges: list[GraphEdgeOut]
+    nodes: list[dict]
+    edges: list[dict]
     stats: dict
     topic_distribution: dict[str, int]
 
 
 PROJECT_COLOR = "#4e79a7"
-TOPIC_COLOR = "#f28e2b"
+DIRECTION_COLOR = "#59a14f"
 
 
 @router.get("/topic-graph", response_model=TopicGraphResponse)
@@ -45,61 +28,57 @@ async def get_topic_graph(session: Session = Depends(get_session)):
     repo = ProjectRepository(session)
     projects = repo.list_with_options()
 
-    nodes: list[GraphNodeOut] = []
-    edges: list[GraphEdgeOut] = []
-    topic_nodes: dict[str, GraphNodeOut] = {}
+    nodes: list[dict] = []
+    edges: list[dict] = []
+    direction_nodes: dict[str, dict] = {}
     project_count = 0
-
-    # Topic distribution
-    topic_counts: dict[str, int] = {}
+    direction_counts: dict[str, int] = {}
 
     for p in projects:
         if not p.id:
             continue
         project_count += 1
 
-        project_node = GraphNodeOut(
-            id=f"project_{p.id}",
-            label=p.name,
-            group="project",
-            title=f"Project: {p.name}\nStars: {p.stars}\nLanguage: {p.language or '-'}",
-            color=PROJECT_COLOR,
-            size=25,
-            shape="dot",
-        )
-        nodes.append(project_node)
+        nodes.append({
+            "id": f"project_{p.id}",
+            "label": p.name,
+            "group": "project",
+            "title": f"Project: {p.name}\nStars: {p.stars}\nLanguage: {p.language or '-'}",
+            "color": PROJECT_COLOR,
+            "size": 25,
+            "shape": "dot",
+        })
 
-        for topic in p.topics or []:
-            topic_counts[topic] = topic_counts.get(topic, 0) + 1
+        for tag in p.tags or []:
+            direction_counts[tag] = direction_counts.get(tag, 0) + 1
 
-            if topic not in topic_nodes:
-                topic_node = GraphNodeOut(
-                    id=f"topic_{topic}",
-                    label=topic,
-                    group="topic",
-                    title=f"Topic: {topic}",
-                    color=TOPIC_COLOR,
-                    size=15,
-                    shape="diamond",
-                )
-                topic_nodes[topic] = topic_node
-                nodes.append(topic_node)
+            if tag not in direction_nodes:
+                direction_node = {
+                    "id": f"direction_{tag}",
+                    "label": tag,
+                    "group": "direction",
+                    "title": f"Direction: {tag}",
+                    "color": DIRECTION_COLOR,
+                    "size": 30,
+                    "shape": "diamond",
+                }
+                direction_nodes[tag] = direction_node
+                nodes.append(direction_node)
 
-            edges.append(
-                GraphEdgeOut(
-                    from_=f"project_{p.id}",
-                    to=f"topic_{topic}",
-                    label=f"{p.name} -> {topic}",
-                )
-            )
+            edges.append({
+                "from": f"project_{p.id}",
+                "to": f"direction_{tag}",
+                "label": f"{p.name} -> {tag}",
+                "color": "#cccccc",
+            })
 
     return TopicGraphResponse(
         nodes=nodes,
         edges=edges,
         stats={
             "project_count": project_count,
-            "topic_count": len(topic_nodes),
+            "topic_count": len(direction_nodes),
             "edge_count": len(edges),
         },
-        topic_distribution=dict(sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)[:30]),
+        topic_distribution=dict(sorted(direction_counts.items(), key=lambda x: x[1], reverse=True)),
     )

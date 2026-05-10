@@ -48,7 +48,7 @@ def main() -> None:
     # Check if user is logged in
     if not st.session_state.get("logged_in"):
         # Show login page
-        login_page = st.Page("pages/login.py", title="登录", icon="🔐")
+        login_page = st.Page("pages/login.py", title="Login", icon="🔐")
         pg = st.navigation([login_page])
         pg.run()
         return
@@ -61,14 +61,14 @@ def main() -> None:
     user = st.session_state.get("user", {})
     with st.sidebar:
         st.divider()
-        st.caption(f"👤 {user.get('username', '未知')}")
-        if st.button("退出登录"):
+        st.caption(f"👤 {user.get('username', 'Unknown')}")
+        if st.button("Logout"):
             del st.session_state["logged_in"]
             del st.session_state["user"]
             st.rerun()
 
     pages = [
-        st.Page("pages/chat.py", title="AI 助手", icon="💬"),
+        st.Page("pages/chat.py", title="Chat", icon="💬"),
         st.Page("pages/radar.py", title="Radar", icon="📡"),
         st.Page("pages/trials.py", title="Trials", icon="🧪"),
         st.Page("pages/shares.py", title="Shares", icon="📤"),

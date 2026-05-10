@@ -273,7 +273,9 @@ def chat_with_ai(query: str, enable_web_search: bool = False) -> ChatResponse:
 2. 如果用户询问具体的GitHub项目，请根据项目信息部分回答
 3. 如果用户询问项目状态（认领、试用等），请根据项目的评估和试用信息回答
 4. 如果没有找到相关信息，请明确说明"知识图谱中没有找到相关项目"
-5. 只有在用户明确询问新项目推荐时，才需要进行Web搜索"""
+5. 只有在用户明确询问新项目推荐时，才需要进行Web搜索
+6. 当回答中提到具体的GitHub项目时，请在项目名称后添加标记：{{VIEW_PROJECT:项目名称}}
+   例如：LangChain {{VIEW_PROJECT:LangChain}} 是一个流行的框架..."""
 
     payload = {
         "model": settings.llm_model,

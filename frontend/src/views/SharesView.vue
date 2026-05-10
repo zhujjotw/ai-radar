@@ -66,7 +66,7 @@ async function handleCreate() {
       knowledge_doc_url: creatingShare.value.knowledge_doc_url,
       shared_by: auth.user?.username,
     })
-    ElMessage.success('分享已创建')
+    ElMessage.success('Share created')
     createDialogVisible.value = false
     loadReadyTrials()
     loadShares()

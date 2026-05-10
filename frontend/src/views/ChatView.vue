@@ -117,7 +117,7 @@ async function sendMessage() {
   } catch (e) {
     messages.value.push({
       role: 'assistant',
-      content: `请求失败: ${e}`,
+      content: `Request failed: ${e}`,
     })
   } finally {
     streaming.value = false
@@ -131,10 +131,10 @@ async function sendMessage() {
   <div style="display: flex; flex-direction: column; height: calc(100vh - 60px);">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
       <div>
-        <h2 style="margin: 0;">AI 助手</h2>
-        <p style="color: #999; margin: 4px 0 0;">基于知识图谱的 GitHub 项目检索</p>
+        <h2 style="margin: 0;">Chat</h2>
+        <p style="color: #999; margin: 4px 0 0;">Query GitHub projects via knowledge graph</p>
       </div>
-      <el-switch v-model="webSearchEnabled" active-text="Web搜索" inactive-text="" />
+      <el-switch v-model="webSearchEnabled" active-text="Web Search" inactive-text="" />
     </div>
 
     <!-- Messages -->
@@ -153,7 +153,7 @@ async function sendMessage() {
             <div v-else v-html="renderAnswer(msg.content)" style="text-align: left;" />
           </div>
           <div v-if="msg.sources?.length" style="font-size: 12px; color: #999; margin-top: 4px;">
-            来源: {{ msg.sources.join(', ') }}
+            Sources: {{ msg.sources.join(', ') }}
           </div>
         </div>
       </div>
@@ -166,14 +166,14 @@ async function sendMessage() {
         </div>
       </div>
 
-      <el-empty v-if="messages.length === 0 && !streaming" description="询问关于 GitHub 项目的问题..." />
+      <el-empty v-if="messages.length === 0 && !streaming" description="Ask about GitHub projects..." />
     </div>
 
     <!-- Input -->
     <div style="margin-top: 12px; display: flex; gap: 8px;">
-      <el-input v-model="inputText" placeholder="询问关于 GitHub 项目的问题..." @keyup.enter="sendMessage" :disabled="streaming" />
+      <el-input v-model="inputText" placeholder="Ask about GitHub projects..." @keyup.enter="sendMessage" :disabled="streaming" />
       <el-button type="primary" @click="sendMessage" :loading="streaming" :disabled="!inputText.trim()">
-        发送
+        Send
       </el-button>
     </div>
   </div>

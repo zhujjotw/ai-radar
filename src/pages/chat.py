@@ -2,13 +2,44 @@
 
 from __future__ import annotations
 
+import re
+
 import streamlit as st
 
 from src.services.ai_chat import chat_with_ai
 
+
+def _render_answer(answer: str) -> None:
+    """Render answer with project view buttons."""
+    # Pattern to match {VIEW_PROJECT:project_name}
+    pattern = r"\{VIEW_PROJECT:([^}]+)\}"
+    
+    # Split answer by the pattern
+    parts = re.split(pattern, answer)
+    
+    # Process parts
+    i = 0
+    while i < len(parts):
+        if i % 2 == 0:
+            # Regular text
+            if parts[i].strip():
+                st.markdown(parts[i])
+        else:
+            # Project name - render button
+            project_name = parts[i].strip()
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.markdown(f"**{project_name}**")
+            with col2:
+                if st.button("View Details", key=f"view_{project_name}_{i}"):
+                    st.query_params["project"] = project_name
+                    st.switch_page("pages/radar.py")
+        i += 1
+
+
 # --- Page header ---
-st.title("AI 助手")
-st.caption("基于知识图谱的GitHub项目检索")
+st.title("AI Assistant")
+st.caption("GitHub project search based on knowledge graph")
 
 # Initialize chat history
 if "messages" not in st.session_state:
@@ -19,25 +50,28 @@ if "web_search_enabled" not in st.session_state:
     st.session_state.web_search_enabled = False
 
 # Display chat history
-for message in st.session_state.messages:
+for idx, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+        if message["role"] == "assistant":
+            _render_answer(message["content"])
+        else:
+            st.markdown(message["content"])
 
-# Chat input with web search toggle
-col1, col2 = st.columns([4, 1])
+# Sidebar with settings
+with st.sidebar:
+    st.header("Settings")
 
-with col1:
-    prompt = st.chat_input("询问关于GitHub项目的问题...")
-
-with col2:
-    st.write("")  # Spacer
-    st.write("")  # Spacer
-    web_search = st.toggle(
-        "Web搜索",
+    # Web search toggle in sidebar
+    web_search_sidebar = st.toggle(
+        "Enable Web Search",
         value=st.session_state.web_search_enabled,
-        help="开启后，当知识图谱中没有相关信息时会进行Web搜索",
+        help="When enabled, performs web search when knowledge graph has no relevant info",
+        key="web_search_sidebar",
     )
-    st.session_state.web_search_enabled = web_search
+    st.session_state.web_search_enabled = web_search_sidebar
+
+# Chat input at the bottom
+prompt = st.chat_input("Ask about GitHub projects...")
 
 if prompt:
     # Add user message to chat history
@@ -49,56 +83,15 @@ if prompt:
 
     # Get AI response
     with st.chat_message("assistant"):
-        with st.spinner("正在检索知识图谱..."):
+        with st.spinner("Searching knowledge graph..."):
             response = chat_with_ai(prompt, enable_web_search=st.session_state.web_search_enabled)
 
-            # Display answer
-            st.markdown(response.answer)
+            # Display answer with project buttons
+            _render_answer(response.answer)
 
             # Display sources
             if response.sources:
-                st.caption(f"来源: {', '.join(response.sources)}")
+                st.caption(f"Sources: {', '.join(response.sources)}")
 
     # Add assistant message to chat history
     st.session_state.messages.append({"role": "assistant", "content": response.answer})
-
-# Sidebar with example queries
-with st.sidebar:
-    st.header("设置")
-
-    # Web search toggle in sidebar
-    web_search_sidebar = st.toggle(
-        "启用Web搜索",
-        value=st.session_state.web_search_enabled,
-        help="开启后，当知识图谱中没有相关信息时会进行Web搜索",
-        key="web_search_sidebar",
-    )
-    st.session_state.web_search_enabled = web_search_sidebar
-
-    st.divider()
-
-    st.header("示例查询")
-    st.markdown("""
-    **项目检索：**
-    - Agent框架有哪些项目？
-    - 推荐一些RAG相关的项目
-    - 有哪些LLM评测工具？
-    - 向量数据库有哪些选择？
-    - 有没有好用的AI代码助手？
-
-    **项目状态：**
-    - 当前有哪些认领项目？
-    - 哪些项目正在试用中？
-    - 有哪些项目已完成demo？
-    - 谁在负责项目试用？
-    - 当前有哪些blocked项目？
-
-    **平台使用：**
-    - AI Radar怎么使用？
-    - 项目状态有哪些？
-    - 怎么认领项目？
-    """)
-
-    if st.button("清空对话"):
-        st.session_state.messages = []
-        st.rerun()

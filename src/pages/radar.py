@@ -34,6 +34,9 @@ _STATUS_STYLE: dict[str, str] = {
 st.title("Candidate Pool")
 st.caption("AI 开源项目候选池 — 浏览、评估、认领")
 
+# Check if we need to expand a specific project from URL params
+_expand_project = st.query_params.get("project", None)
+
 # --- Filters ---
 st.subheader("筛选")
 filter_cols = st.columns(2)
@@ -163,7 +166,7 @@ else:
             f"{owner_str}  "
         )
 
-        with st.expander(header, expanded=False):
+        with st.expander(header, expanded=(_expand_project == project.name)):
             # ---- Project Info ----
             col_a, col_b, col_c = st.columns(3)
             with col_a:

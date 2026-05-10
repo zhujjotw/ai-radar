@@ -12,16 +12,16 @@ const loading = ref(false)
 
 async function handleLogin() {
   if (!form.value.username || !form.value.password) {
-    ElMessage.warning('请输入用户名和密码')
+    ElMessage.warning('Please enter username and password')
     return
   }
   loading.value = true
   try {
     await auth.login(form.value.username, form.value.password)
-    ElMessage.success('登录成功')
+    ElMessage.success('Login successful')
     router.push('/')
   } catch (e: unknown) {
-    const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '登录失败'
+    const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Login failed'
     ElMessage.error(msg)
   } finally {
     loading.value = false
@@ -34,24 +34,24 @@ async function handleLogin() {
     <template #header>
       <div style="text-align: center;">
         <h2 style="margin: 0;">AI Radar</h2>
-        <p style="color: #999; margin: 8px 0 0;">使用公司账号登录</p>
+        <p style="color: #999; margin: 8px 0 0;">Sign in with your company account</p>
       </div>
     </template>
     <el-form @submit.prevent="handleLogin">
-      <el-form-item label="用户名">
+      <el-form-item label="Username">
         <el-input v-model="form.username" placeholder="zhang.san" />
       </el-form-item>
-      <el-form-item label="密码">
+      <el-form-item label="Password">
         <el-input v-model="form.password" type="password" show-password @keyup.enter="handleLogin" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :loading="loading" @click="handleLogin" style="width: 100%;">
-          登录
+          Sign In
         </el-button>
       </el-form-item>
     </el-form>
     <div style="color: #999; font-size: 12px;">
-      使用公司 LDAP 账号登录，登录后可访问 AI Radar 所有功能
+      Use your company LDAP account to access AI Radar.
     </div>
   </el-card>
 </template>

@@ -12,7 +12,7 @@ const auth = useAuthStore()
 const isCollapse = ref(false)
 
 const menuItems = [
-  { path: '/chat', title: 'AI 助手', icon: ChatDotRound },
+  { path: '/chat', title: 'Chat', icon: ChatDotRound },
   { path: '/radar', title: 'Radar', icon: Position },
   { path: '/trials', title: 'Trials', icon: Trophy },
   { path: '/shares', title: 'Shares', icon: Share },
@@ -53,7 +53,7 @@ function handleLogout() {
         </el-button>
         <el-button text type="danger" @click="handleLogout" style="width: 100%;">
           <el-icon><SwitchButton /></el-icon>
-          <span v-if="!isCollapse">退出</span>
+          <span v-if="!isCollapse">Sign Out</span>
         </el-button>
       </div>
     </el-aside>
