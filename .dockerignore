@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+.venv
+.pytest_cache
+.ruff_cache
+
+# Node
+node_modules
+frontend/node_modules
+frontend/.vite
+
+# IDE
+.vscode
+.idea
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+
+# Data
+data/*.db
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+*.md
+!README.md
+
+# Claude
+.claude
+.clawhub
+.gnhf
