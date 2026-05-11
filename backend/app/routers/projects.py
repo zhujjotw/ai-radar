@@ -178,7 +178,8 @@ async def list_projects(
         evaluation = eval_repo.get_latest_by_project(p.id) if p.id else None
         trials = _trial_cache.get(p.id, [])
         active = _get_active_trial(trials)
-        owner = active.owner if active else ""
+        # Use project owner instead of trial owner
+        owner = p.owner or ""
 
         items.append(
             ProjectListItem(
@@ -228,7 +229,8 @@ async def get_project(project_id: int, session: Session = Depends(get_session)):
     evaluation = eval_repo.get_latest_by_project(project_id)
     trials = trial_repo.list_by_project(project_id)
     active = _get_active_trial(trials)
-    owner = active.owner if active else ""
+    # Use project owner instead of trial owner
+    owner = project.owner or ""
 
     return ProjectDetail(
         id=project.id,

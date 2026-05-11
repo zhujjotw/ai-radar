@@ -80,6 +80,27 @@ def _fetch_search_results(
 
         data = resp.json()
         page_items = data.get("items", [])
+
+        # Fetch topics for each repo (requires separate API call)
+        for item in page_items:
+            full_name = item.get("full_name")
+            if full_name and token:
+                try:
+                    repo_resp = requests.get(
+                        f"{_GITHUB_API}/repos/{full_name}",
+                        headers=headers,
+                        timeout=15,
+                    )
+                    if repo_resp.status_code == 200:
+                        repo_data = repo_resp.json()
+                        item["topics"] = repo_data.get("topics", [])
+                    else:
+                        item["topics"] = []
+                except requests.RequestException:
+                    item["topics"] = []
+            else:
+                item["topics"] = []
+
         items.extend(page_items)
         if len(page_items) < _PER_PAGE:
             break
@@ -101,10 +122,14 @@ def _parse_github_datetime(value: str | None) -> datetime | None:
 def _github_item_to_project(item: dict) -> Project:
     """Convert a GitHub search API item to a ``Project`` model instance."""
     full_name = item["full_name"]
+    # Extract owner from full_name (format: "owner/repo")
+    owner = full_name.split("/")[0] if "/" in full_name else None
+
     return Project(
         github_url=item["html_url"],
         repo_full_name=full_name,
         name=item["name"],
+        owner=owner,
         description=item.get("description"),
         pool="candidate",
         source="github_search",

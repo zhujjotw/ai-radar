@@ -60,12 +60,19 @@ def _parse_trending_html(html: str) -> list[dict]:
         else:
             repo["description"] = None
 
-        # Extract language
+        # Extract language (clean any HTML tags)
         lang_match = re.search(
-            r'itemprop="programmingLanguage"[^>]*>\s*(\S+)',
+            r'itemprop="programmingLanguage"[^>]*>\s*(?:<[^>]+>)?\s*(\w+)',
             article_html,
         )
-        repo["language"] = lang_match.group(1) if lang_match else None
+        if lang_match:
+            # Use the last capturing group which should be the language name
+            language = lang_match.group(2) if lang_match.lastindex >= 2 else lang_match.group(1)
+            # Clean any remaining HTML tags
+            language = re.sub(r'<[^>]+>', '', language).strip()
+        else:
+            language = None
+        repo["language"] = language
 
         # Extract total stars from stargazers link
         stars_match = re.search(
@@ -148,11 +155,19 @@ def _item_to_project(item: dict) -> Project:
     """Convert a parsed trending item to a Project model."""
     full_name = item["full_name"]
     github_url = f"https://github.com/{full_name}"
+    # Extract owner from full_name (format: "owner/repo")
+    owner = full_name.split("/")[0] if "/" in full_name else None
+
+    # Clean language field of HTML tags
+    language = item.get("language")
+    if language:
+        language = re.sub(r'<[^>]+>', '', str(language)).strip()
 
     return Project(
         github_url=github_url,
         repo_full_name=full_name,
         name=full_name.split("/")[-1],
+        owner=owner,
         description=item.get("description"),
         pool="candidate",
         source="github_trending",
@@ -160,7 +175,7 @@ def _item_to_project(item: dict) -> Project:
         f"{item.get('trending_period', 'today')}",
         stars=item.get("stars", 0),
         forks=item.get("forks", 0),
-        language=item.get("language"),
+        language=language,
         topics=[],
         tags=[],
         last_pushed_at=None,
@@ -210,7 +225,10 @@ def fetch_trending_projects(
             if full_name in seen:
                 continue
             seen.add(full_name)
-            projects.append(_item_to_project(item))
+            project = _item_to_project(item)
+            # Add trending tag
+            project.tags = ["Trending"]
+            projects.append(project)
 
         # Be polite between requests
         if len(languages) > 1:

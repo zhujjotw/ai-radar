@@ -10,12 +10,13 @@ def utc_now() -> datetime:
 
 class Project(SQLModel, table=True):
     __tablename__ = "projects"
-    __table_args__ = (UniqueConstraint("repo_full_name", name="uq_projects_repo_full_name"),)
+    __table_args__ = (UniqueConstraint("repo_full_name", name="uq_projects_repo_full_name"), {'extend_existing': True})
 
     id: int | None = Field(default=None, primary_key=True)
     github_url: str
     repo_full_name: str = Field(index=True)
     name: str
+    owner: str | None = None
     description: str | None = None
     pool: str = Field(default="candidate", index=True)
     source: str = Field(default="manual", index=True)
@@ -42,6 +43,7 @@ class Project(SQLModel, table=True):
 
 class Evaluation(SQLModel, table=True):
     __tablename__ = "evaluations"
+    __table_args__ = {'extend_existing': True}
 
     id: int | None = Field(default=None, primary_key=True)
     project_id: int = Field(foreign_key="projects.id", index=True)
@@ -58,6 +60,7 @@ class Evaluation(SQLModel, table=True):
 
 class Trial(SQLModel, table=True):
     __tablename__ = "trials"
+    __table_args__ = {'extend_existing': True}
 
     id: int | None = Field(default=None, primary_key=True)
     project_id: int = Field(foreign_key="projects.id", index=True)
@@ -75,6 +78,7 @@ class Trial(SQLModel, table=True):
 
 class Share(SQLModel, table=True):
     __tablename__ = "shares"
+    __table_args__ = {'extend_existing': True}
 
     id: int | None = Field(default=None, primary_key=True)
     trial_id: int = Field(foreign_key="trials.id", index=True)
@@ -90,6 +94,7 @@ class Share(SQLModel, table=True):
 
 class GraphNode(SQLModel, table=True):
     __tablename__ = "graph_nodes"
+    __table_args__ = {'extend_existing': True}
 
     id: int | None = Field(default=None, primary_key=True)
     node_type: str = Field(index=True)
@@ -102,6 +107,7 @@ class GraphNode(SQLModel, table=True):
 
 class GraphEdge(SQLModel, table=True):
     __tablename__ = "graph_edges"
+    __table_args__ = {'extend_existing': True}
 
     id: int | None = Field(default=None, primary_key=True)
     source_node_id: int = Field(foreign_key="graph_nodes.id", index=True)

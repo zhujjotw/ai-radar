@@ -20,6 +20,7 @@ def _migrate_new_columns() -> None:
     new_columns = [
         ("projects", "llm_description", "TEXT"),
         ("projects", "llm_scenarios", "TEXT"),
+        ("projects", "owner", "TEXT"),
     ]
     with engine.connect() as conn:
         for table, column, col_type in new_columns:
