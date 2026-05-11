@@ -3,9 +3,12 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.db import init_db
@@ -86,7 +89,36 @@ app.include_router(graph.router, prefix="/api/graph", tags=["graph"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 
+# Mount Vue frontend static files
+frontend_dist = Path("/app/frontend/dist")
+if frontend_dist.exists():
+    app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
+
 
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str) -> Response:
+    """Serve Vue SPA for all non-API routes."""
+    # Don't intercept API routes
+    if full_path.startswith("api/"):
+        return Response("API route not found", status_code=404)
+
+    # Serve top-level static files from dist (e.g. /logo.jpg, /favicon.ico)
+    # before falling back to the SPA index.html. Guard against path traversal.
+    if full_path:
+        candidate = (frontend_dist / full_path).resolve()
+        try:
+            candidate.relative_to(frontend_dist.resolve())
+        except ValueError:
+            candidate = None
+        if candidate and candidate.is_file():
+            return FileResponse(candidate)
+
+    index_file = frontend_dist / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return Response("Frontend not built", status_code=503)

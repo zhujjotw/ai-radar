@@ -5,8 +5,7 @@ services:
     build: .
     container_name: ai-radar
     ports:
-      - "8000:8000"  # FastAPI backend
-      - "8501:8501"  # Streamlit frontend
+      - "8001:8000"  # FastAPI backend (serves Vue frontend)
     volumes:
       - ai-radar-data:/app/data
     env_file:

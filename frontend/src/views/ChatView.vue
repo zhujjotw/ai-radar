@@ -42,7 +42,7 @@ function renderAnswer(text: string): string {
 }
 
 // Expose navigation function globally for onclick handlers
-;(window as Record<string, unknown>).__navigateToProject = (name: string) => {
+;(window as unknown as Record<string, unknown>).__navigateToProject = (name: string) => {
   router.push({ path: '/radar', query: { project: name } })
 }
 
@@ -128,7 +128,7 @@ async function sendMessage() {
 </script>
 
 <template>
-  <div style="display: flex; flex-direction: column; height: calc(100vh - 60px);">
+  <div style="display: flex; flex-direction: column; height: 100%; min-height: 0;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
       <div>
         <h2 style="margin: 0;">Chat</h2>
@@ -170,9 +170,38 @@ async function sendMessage() {
     </div>
 
     <!-- Input -->
-    <div style="margin-top: 12px; display: flex; gap: 8px;">
-      <el-input v-model="inputText" placeholder="Ask about GitHub projects..." @keyup.enter="sendMessage" :disabled="streaming" />
-      <el-button type="primary" @click="sendMessage" :loading="streaming" :disabled="!inputText.trim()">
+    <div
+      style="
+        margin-top: 16px;
+        margin-bottom: 8px;
+        padding: 12px;
+        display: flex;
+        gap: 12px;
+        align-items: flex-end;
+        background: #fff;
+        border: 1px solid #e6e6e6;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      "
+    >
+      <el-input
+        v-model="inputText"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 6 }"
+        resize="none"
+        placeholder="Ask about GitHub projects... (Enter to send, Shift+Enter for newline)"
+        :disabled="streaming"
+        style="flex: 1;"
+        @keydown.enter.exact.prevent="sendMessage"
+      />
+      <el-button
+        type="primary"
+        size="large"
+        @click="sendMessage"
+        :loading="streaming"
+        :disabled="!inputText.trim()"
+        style="height: 44px; min-width: 88px;"
+      >
         Send
       </el-button>
     </div>

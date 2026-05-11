@@ -94,6 +94,40 @@ function handleExpand(row: Record<string, unknown>, expanded: boolean) {
   }
 }
 
+// Helper function to safely get field values for v-model
+function getField(trialId: number, field: keyof RowFields): string {
+  if (!expandedFields.value[trialId]) {
+    // Initialize if not exists
+    expandedFields.value[trialId] = {
+      selected_target: '',
+      owner: '',
+      environment: '',
+      demo_url: '',
+      trial_notes: '',
+      result_summary: '',
+      next_action: '',
+    }
+  }
+  return expandedFields.value[trialId][field]
+}
+
+// Helper function to safely update field values
+function updateField(trialId: number, field: keyof RowFields, value: string): void {
+  if (!expandedFields.value[trialId]) {
+    // Initialize if not exists
+    expandedFields.value[trialId] = {
+      selected_target: '',
+      owner: '',
+      environment: '',
+      demo_url: '',
+      trial_notes: '',
+      result_summary: '',
+      next_action: '',
+    }
+  }
+  (expandedFields.value[trialId] as unknown as Record<string, string>)[field] = value
+}
+
 // Primary action: direct transition (no extra fields needed)
 async function handlePrimary(row: { id: number; status: string; project_name: string | null }) {
   const action = primaryActions[row.status]
@@ -158,7 +192,8 @@ async function handleDialogConfirm() {
   const d = dialogData.value
   // Validate required fields
   for (const f of dialogFields.value) {
-    if (f.required && !d[f.key as keyof typeof d]?.trim()) {
+    const value = d[f.key as keyof typeof d]
+    if (f.required && (typeof value !== 'string' || !value.trim())) {
       ElMessage.warning(`Please fill in ${f.label}`)
       return
     }
@@ -240,32 +275,32 @@ onMounted(async () => {
               <el-row :gutter="16">
                 <el-col :span="12">
                   <el-form-item label="Owner">
-                    <el-input v-model="expandedFields[row.id].owner" />
+                    <el-input :model-value="getField(row.id, 'owner')" @update:model-value="(val: string) => updateField(row.id, 'owner', val)" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
                   <el-form-item label="Environment">
-                    <el-input v-model="expandedFields[row.id].environment" placeholder="Trial environment" />
+                    <el-input :model-value="getField(row.id, 'environment')" @update:model-value="(val: string) => updateField(row.id, 'environment', val)" placeholder="Trial environment" />
                   </el-form-item>
                 </el-col>
               </el-row>
               <el-row :gutter="16">
                 <el-col :span="12">
                   <el-form-item label="Demo URL">
-                    <el-input v-model="expandedFields[row.id].demo_url" placeholder="Demo URL" />
+                    <el-input :model-value="getField(row.id, 'demo_url')" @update:model-value="(val: string) => updateField(row.id, 'demo_url', val)" placeholder="Demo URL" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
                   <el-form-item label="Next Action">
-                    <el-input v-model="expandedFields[row.id].next_action" placeholder="Next action" />
+                    <el-input :model-value="getField(row.id, 'next_action')" @update:model-value="(val: string) => updateField(row.id, 'next_action', val)" placeholder="Next action" />
                   </el-form-item>
                 </el-col>
               </el-row>
               <el-form-item label="Notes">
-                <el-input v-model="expandedFields[row.id].trial_notes" type="textarea" :rows="2" placeholder="Trial notes" />
+                <el-input :model-value="getField(row.id, 'trial_notes')" @update:model-value="(val: string) => updateField(row.id, 'trial_notes', val)" type="textarea" :rows="2" placeholder="Trial notes" />
               </el-form-item>
               <el-form-item label="Result">
-                <el-input v-model="expandedFields[row.id].result_summary" type="textarea" :rows="2" placeholder="Result summary" />
+                <el-input :model-value="getField(row.id, 'result_summary')" @update:model-value="(val: string) => updateField(row.id, 'result_summary', val)" type="textarea" :rows="2" placeholder="Result summary" />
               </el-form-item>
               <el-form-item>
                 <el-button type="primary" size="small" @click="handleSaveDetail(row.id)">Save Details</el-button>

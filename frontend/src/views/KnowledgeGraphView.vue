@@ -37,7 +37,7 @@ onMounted(async () => {
   const visNetwork = await import('vis-network')
   const visData = await import('vis-data')
 
-  const nodes = new visData.DataSet(
+  const nodes = new visData.DataSet<any>(
     graphData.value.nodes.map((n) => ({
       id: n.id,
       label: n.label,
@@ -48,7 +48,7 @@ onMounted(async () => {
       shape: n.shape,
     }))
   )
-  const edges = new visData.DataSet(
+  const edges = new visData.DataSet<any>(
     graphData.value.edges.map((e) => ({
       from: e.from,
       to: e.to,

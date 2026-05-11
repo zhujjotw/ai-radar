@@ -29,9 +29,15 @@ function handleLogout() {
 <template>
   <el-container style="height: 100vh">
     <el-aside :width="isCollapse ? '64px' : '200px'" style="border-right: 1px solid #e6e6e6; transition: width 0.3s;">
-      <div style="padding: 16px; text-align: center; font-size: 18px; font-weight: bold; white-space: nowrap;">
-        <span v-if="!isCollapse">AI Radar</span>
-        <span v-else>AR</span>
+      <div
+        style="padding: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; white-space: nowrap;"
+      >
+        <img
+          src="/logo.jpg"
+          alt="AI Radar"
+          style="width: 32px; height: 32px; border-radius: 8px; object-fit: cover; flex-shrink: 0;"
+        />
+        <span v-if="!isCollapse" style="font-size: 18px; font-weight: bold;">AI Radar</span>
       </div>
       <el-menu
         :default-active="route.path"

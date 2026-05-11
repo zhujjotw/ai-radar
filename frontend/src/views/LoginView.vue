@@ -33,6 +33,11 @@ async function handleLogin() {
   <el-card style="width: 400px;" shadow="hover">
     <template #header>
       <div style="text-align: center;">
+        <img
+          src="/logo.jpg"
+          alt="AI Radar"
+          style="width: 64px; height: 64px; border-radius: 14px; object-fit: cover; display: block; margin: 0 auto 12px;"
+        />
         <h2 style="margin: 0;">AI Radar</h2>
         <p style="color: #999; margin: 8px 0 0;">Sign in with your company account</p>
       </div>
