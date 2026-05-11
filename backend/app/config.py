@@ -27,9 +27,23 @@ class Settings(BaseSettings):
     )
 
 
-@lru_cache
+# Global settings instance that can be dynamically updated
+_settings_instance: Settings | None = None
+
+
 def get_settings() -> Settings:
-    return Settings()
+    """Get current settings instance, creating if needed."""
+    global _settings_instance
+    if _settings_instance is None:
+        _settings_instance = Settings()
+    return _settings_instance
+
+
+def reload_settings() -> Settings:
+    """Force reload settings from environment and .env file."""
+    global _settings_instance
+    _settings_instance = Settings()
+    return _settings_instance
 
 
 def load_yaml_config(name: str) -> dict[str, Any]:

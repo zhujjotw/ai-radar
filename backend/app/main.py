@@ -30,6 +30,28 @@ async def _auto_sync_loop() -> None:
             await asyncio.sleep(60)
 
 
+async def restart_auto_sync_task(interval_minutes: int) -> None:
+    """Restart the auto-sync task with new interval."""
+    global _sync_task
+
+    # Cancel existing task
+    if _sync_task and not _sync_task.done():
+        _sync_task.cancel()
+        try:
+            await _sync_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Auto-sync task cancelled")
+
+    # Start new task if interval > 0
+    if interval_minutes and interval_minutes > 0:
+        _sync_task = asyncio.create_task(_auto_sync_loop())
+        logger.info("Auto-sync task started (interval=%d min)", interval_minutes)
+    else:
+        _sync_task = None
+        logger.info("Auto-sync disabled")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _sync_task

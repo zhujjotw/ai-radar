@@ -3,7 +3,8 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.config import Settings, get_settings
+import app.main as main_app
+from app.config import reload_settings, get_settings
 from app.services.sync import get_sync_status, start_sync
 
 router = APIRouter()
@@ -26,7 +27,7 @@ class SettingsUpdate(BaseModel):
 
 
 @router.get("", response_model=SettingsOut)
-async def get_settings_endpoint(settings: Settings = Depends(get_settings)):
+async def get_settings_endpoint(settings = Depends(get_settings)):
     return SettingsOut(
         llm_api_key_set=bool(settings.llm_api_key),
         llm_base_url=settings.llm_base_url,
@@ -39,7 +40,7 @@ async def get_settings_endpoint(settings: Settings = Depends(get_settings)):
 @router.put("")
 async def update_settings(
     req: SettingsUpdate,
-    settings: Settings = Depends(get_settings),
+    settings = Depends(get_settings),
 ):
     env_path = settings.model_config.get("env_file")
     if not env_path:
@@ -58,6 +59,9 @@ async def update_settings(
         pass
 
     # Update
+    sync_interval_changed = False
+    old_sync_interval = settings.sync_interval_minutes
+
     if req.llm_api_key is not None:
         existing["LLM_API_KEY"] = req.llm_api_key.strip()
     if req.llm_base_url is not None:
@@ -68,13 +72,22 @@ async def update_settings(
         existing["GITHUB_TOKEN"] = req.github_token.strip()
     if req.sync_interval_minutes is not None:
         existing["SYNC_INTERVAL_MINUTES"] = str(req.sync_interval_minutes)
+        if req.sync_interval_minutes != old_sync_interval:
+            sync_interval_changed = True
 
     # Write
     with open(env_path, "w", encoding="utf-8") as f:
         for k, v in existing.items():
             f.write(f"{k}={v}\n")
 
-    return {"message": "Settings saved. Restart to apply."}
+    # Reload settings to apply changes immediately
+    new_settings = reload_settings()
+
+    # Restart auto-sync if interval changed
+    if sync_interval_changed:
+        await main_app.restart_auto_sync_task(new_settings.sync_interval_minutes)
+
+    return {"message": "Settings saved and applied successfully."}
 
 
 @router.post("/sync")

@@ -32,7 +32,7 @@ async function handleSave() {
   loading.value = true
   try {
     await api.put('/settings', form.value)
-    ElMessage.success('Settings saved. Restart to apply.')
+    ElMessage.success('Settings saved and applied successfully!')
     loadSettings()
   } finally {
     loading.value = false
