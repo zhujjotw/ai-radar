@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.config import Settings, get_settings
+from app.services.sync import get_sync_status, start_sync
 
 router = APIRouter()
 
@@ -13,6 +14,7 @@ class SettingsOut(BaseModel):
     llm_base_url: str
     llm_model: str
     github_token_set: bool
+    sync_interval_minutes: int
 
 
 class SettingsUpdate(BaseModel):
@@ -20,6 +22,7 @@ class SettingsUpdate(BaseModel):
     llm_base_url: str | None = None
     llm_model: str | None = None
     github_token: str | None = None
+    sync_interval_minutes: int | None = None
 
 
 @router.get("", response_model=SettingsOut)
@@ -29,6 +32,7 @@ async def get_settings_endpoint(settings: Settings = Depends(get_settings)):
         llm_base_url=settings.llm_base_url,
         llm_model=settings.llm_model,
         github_token_set=bool(settings.github_token),
+        sync_interval_minutes=settings.sync_interval_minutes,
     )
 
 
@@ -62,6 +66,8 @@ async def update_settings(
         existing["LLM_MODEL"] = req.llm_model.strip()
     if req.github_token is not None:
         existing["GITHUB_TOKEN"] = req.github_token.strip()
+    if req.sync_interval_minutes is not None:
+        existing["SYNC_INTERVAL_MINUTES"] = str(req.sync_interval_minutes)
 
     # Write
     with open(env_path, "w", encoding="utf-8") as f:
@@ -69,3 +75,13 @@ async def update_settings(
             f.write(f"{k}={v}\n")
 
     return {"message": "Settings saved. Restart to apply."}
+
+
+@router.post("/sync")
+async def trigger_sync():
+    return start_sync()
+
+
+@router.get("/sync/status")
+async def sync_status():
+    return get_sync_status()

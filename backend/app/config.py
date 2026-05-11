@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     llm_model: str = "gpt-4o-mini"
     jwt_secret: str = "change-me-in-production"
     jwt_expire_hours: int = 24
+    sync_interval_minutes: int = 0
 
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env",

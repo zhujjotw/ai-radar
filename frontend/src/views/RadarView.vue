@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useProjectStore } from '@/stores/project'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ProjectListItem } from '@/api/projects'
 import { fetchProject, type ProjectDetail } from '@/api/projects'
+import api from '@/api/client'
 
 const store = useProjectStore()
 const auth = useAuthStore()
@@ -12,6 +13,8 @@ const auth = useAuthStore()
 const drawerVisible = ref(false)
 const selectedProject = ref<ProjectDetail | null>(null)
 const loadingDetail = ref(false)
+const syncing = ref(false)
+let syncPollTimer: ReturnType<typeof setTimeout> | null = null
 
 const statusColors: Record<string, string> = {
   needs_review: 'info',
@@ -76,6 +79,37 @@ async function handleClaim(project: ProjectListItem) {
   }
 }
 
+async function handleSync() {
+  syncing.value = true
+  try {
+    await api.post('/settings/sync')
+    pollSyncStatus()
+  } catch {
+    syncing.value = false
+  }
+}
+
+function pollSyncStatus() {
+  syncPollTimer = setTimeout(async () => {
+    try {
+      const { data } = await api.get('/settings/sync/status')
+      if (data.status === 'running') {
+        pollSyncStatus()
+      } else {
+        syncing.value = false
+        if (data.last_result?.error) {
+          ElMessage.error('Sync failed')
+        } else if (data.last_result) {
+          ElMessage.success(`Sync done: ${data.last_result.inserted} new, ${data.last_result.skipped} existing`)
+          store.fetchProjects()
+        }
+      }
+    } catch {
+      syncing.value = false
+    }
+  }, 2000)
+}
+
 function handleFilterChange() {
   store.fetchProjects()
 }
@@ -83,6 +117,10 @@ function handleFilterChange() {
 onMounted(() => {
   store.fetchTags()
   store.fetchProjects()
+})
+
+onUnmounted(() => {
+  if (syncPollTimer) clearTimeout(syncPollTimer)
 })
 </script>
 
@@ -104,7 +142,10 @@ onMounted(() => {
         </el-select>
       </el-col>
       <el-col :span="12" style="text-align: right; color: #999;">
-        {{ store.projects.length }} projects
+        <el-button type="primary" size="small" :loading="syncing" @click.stop="handleSync">
+          {{ syncing ? 'Syncing...' : 'Sync Now' }}
+        </el-button>
+        <span style="margin-left: 8px;">{{ store.projects.length }} projects</span>
       </el-col>
     </el-row>
 

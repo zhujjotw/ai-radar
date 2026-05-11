@@ -8,15 +8,24 @@ const form = ref({
   llm_base_url: '',
   llm_model: '',
   github_token: '',
+  sync_interval_minutes: 0,
 })
-const status = ref({ llm_api_key_set: false, llm_base_url: '', llm_model: '', github_token_set: false })
+const status = ref({ llm_api_key_set: false, llm_base_url: '', llm_model: '', github_token_set: false, sync_interval_minutes: 0 })
 const loading = ref(false)
+const syncStatus = ref<{ status: string; last_result: any } | null>(null)
 
 async function loadSettings() {
   const { data } = await api.get('/settings')
   status.value = data
   form.value.llm_base_url = data.llm_base_url
   form.value.llm_model = data.llm_model
+  form.value.sync_interval_minutes = data.sync_interval_minutes || 0
+  loadSyncStatus()
+}
+
+async function loadSyncStatus() {
+  const { data } = await api.get('/settings/sync/status')
+  syncStatus.value = data
 }
 
 async function handleSave() {
@@ -67,6 +76,30 @@ onMounted(loadSettings)
         <el-form-item>
           <el-tag v-if="status.github_token_set" type="success">Token 已配置</el-tag>
           <el-tag v-else type="info">未配置 Token</el-tag>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
+    <!-- Sync Config -->
+    <el-card style="margin-bottom: 16px;">
+      <template #header><strong>Sync Configuration</strong></template>
+      <el-form label-width="160px">
+        <el-form-item label="Auto Sync Interval (min)">
+          <el-input-number v-model="form.sync_interval_minutes" :min="0" :step="30" />
+          <span style="margin-left: 8px; color: #999; font-size: 12px;">0 = disabled</span>
+        </el-form-item>
+        <el-form-item v-if="syncStatus">
+          <el-tag v-if="syncStatus.status === 'running'" type="warning">Syncing...</el-tag>
+          <template v-else-if="syncStatus.last_result">
+            <el-tag v-if="syncStatus.last_result.error" type="danger">Last sync failed</el-tag>
+            <el-tag v-else type="success">
+              Last sync: {{ syncStatus.last_result.inserted }} new, {{ syncStatus.last_result.skipped }} existing
+              <span v-if="syncStatus.last_result.finished_at" style="margin-left: 4px;">
+                ({{ syncStatus.last_result.finished_at.replace('T', ' ').slice(0, 19) }})
+              </span>
+            </el-tag>
+          </template>
+          <el-tag v-else type="info">No sync yet</el-tag>
         </el-form-item>
       </el-form>
     </el-card>
