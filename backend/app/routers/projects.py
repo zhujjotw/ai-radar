@@ -2,16 +2,25 @@
 
 from __future__ import annotations
 
+import re
+from datetime import datetime, timezone
+from typing import Any
+
+import requests
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.auth import AuthUser, get_current_user
+from app.config import get_settings
 from app.db import get_session
 from app.models import Evaluation, Trial
 from app.repositories import EvaluationRepository, ProjectRepository, TrialRepository
 
 router = APIRouter()
+
+_GITHUB_API_URL = "https://api.github.com/repos"
+_GITHUB_RAW_BASE = "https://raw.githubusercontent.com"
 
 
 class ProjectListItem(BaseModel):
@@ -109,6 +118,132 @@ def _fmt_dt(dt) -> str | None:
 def _get_active_trial(trials: list[Trial]) -> Trial | None:
     active = [t for t in trials if t.status not in ("dropped",)]
     return active[-1] if active else None
+
+
+def _parse_github_url(url: str) -> tuple[str, str] | None:
+    """Parse GitHub URL to extract owner and repo name.
+
+    Returns (owner, repo) tuple or None if invalid.
+    Supports: github.com/owner/repo, github.com/owner/repo/
+    """
+    # Match github.com/owner/repo format
+    match = re.match(r'https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/?', url)
+    if match:
+        return match.group(1), match.group(2)
+    return None
+
+
+def _fetch_github_repo_info(owner: str, repo: str) -> dict[str, Any] | None:
+    """Fetch repository information from GitHub API.
+
+    Returns dict with repo metadata or None if failed.
+    """
+    settings = get_settings()
+    headers = {"Accept": "application/vnd.github.v3+json"}
+    if settings.github_token:
+        headers["Authorization"] = f"token {settings.github_token}"
+
+    try:
+        # Fetch basic repo info
+        url = f"{_GITHUB_API_URL}/{owner}/{repo}"
+        resp = requests.get(url, headers=headers, timeout=30)
+        if resp.status_code != 200:
+            return None
+
+        data = resp.json()
+
+        # Extract topics (need separate request or they're in the same response)
+        topics = data.get("topics", [])
+
+        return {
+            "name": data.get("name"),
+            "full_name": data.get("full_name"),
+            "description": data.get("description"),
+            "stars": data.get("stargazers_count", 0),
+            "forks": data.get("forks_count", 0),
+            "open_issues": data.get("open_issues_count", 0),
+            "language": data.get("language"),
+            "license": data.get("license", {}).get("name") if data.get("license") else None,
+            "topics": topics,
+            "homepage": data.get("homepage"),
+            "pushed_at": data.get("pushed_at"),
+            "created_at": data.get("created_at"),
+        }
+    except Exception:
+        return None
+
+
+class AddProjectFromUrlRequest(BaseModel):
+    github_url: str
+
+
+@router.post("/from-github")
+async def add_project_from_github_url(
+    req: AddProjectFromUrlRequest,
+    session: Session = Depends(get_session),
+):
+    """Add a project by fetching its information from GitHub URL.
+
+    Validates the URL, fetches repository info from GitHub API,
+    and creates a new project in the database.
+    """
+    # Validate GitHub URL
+    parsed = _parse_github_url(req.github_url)
+    if not parsed:
+        raise HTTPException(400, "Invalid GitHub URL. Must be a github.com repository URL.")
+
+    owner, repo = parsed
+    full_name = f"{owner}/{repo}"
+
+    # Check if already exists
+    repo_repo = ProjectRepository(session)
+    existing = repo_repo.get_by_repo_full_name(full_name)
+    if existing:
+        raise HTTPException(400, f"Project {full_name} already exists in the database.")
+
+    # Fetch repository info from GitHub API
+    repo_info = _fetch_github_repo_info(owner, repo)
+    if not repo_info:
+        raise HTTPException(404, f"Failed to fetch repository information for {full_name}. Check the URL and try again.")
+
+    # Create project model
+    from app.models import Project
+
+    project = Project(
+        github_url=req.github_url,
+        repo_full_name=full_name,
+        name=repo_info["name"],
+        owner=owner,
+        description=repo_info.get("description"),
+        pool="candidate",
+        source="manual",
+        discovered_reason=f"Manually added from GitHub URL",
+        stars=repo_info["stars"],
+        forks=repo_info["forks"],
+        open_issues=repo_info["open_issues"],
+        language=repo_info.get("language"),
+        license=repo_info.get("license"),
+        topics=repo_info.get("topics", []),
+        tags=[],
+        last_pushed_at=datetime.fromisoformat(repo_info["pushed_at"].replace("Z", "+00:00")) if repo_info.get("pushed_at") else datetime.now(timezone.utc),
+        first_seen_at=datetime.now(timezone.utc),
+        last_checked_at=datetime.now(timezone.utc),
+    )
+
+    # Save to database
+    created = repo_repo.upsert(project)
+
+    return {
+        "message": f"Successfully added {full_name}",
+        "project": {
+            "id": created.id,
+            "name": created.name,
+            "full_name": created.repo_full_name,
+            "stars": created.stars,
+            "language": created.language,
+        }
+    }
+
 
 
 @router.get("", response_model=list[ProjectListItem])

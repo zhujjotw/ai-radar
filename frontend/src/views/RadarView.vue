@@ -14,6 +14,8 @@ const drawerVisible = ref(false)
 const selectedProject = ref<ProjectDetail | null>(null)
 const loadingDetail = ref(false)
 const syncing = ref(false)
+const githubUrlInput = ref('')
+const addingFromUrl = ref(false)
 let syncPollTimer: ReturnType<typeof setTimeout> | null = null
 
 const statusColors: Record<string, string> = {
@@ -114,6 +116,36 @@ function handleFilterChange() {
   store.fetchProjects()
 }
 
+async function handleAddFromGithubUrl() {
+  const url = githubUrlInput.value.trim()
+  if (!url) {
+    ElMessage.warning('Please enter a GitHub URL')
+    return
+  }
+
+  // Basic validation
+  if (!url.includes('github.com/') && !url.includes('github.com:')) {
+    ElMessage.error('Must be a GitHub URL (github.com)')
+    return
+  }
+
+  addingFromUrl.value = true
+  try {
+    const { data } = await api.post('/projects/from-github', { github_url: url })
+    ElMessage.success(`Added ${data.project.full_name}`)
+    githubUrlInput.value = ''
+    store.fetchProjects()
+  } catch (error: unknown) {
+    const err = error as Record<string, unknown>
+    const responseData = err?.response as Record<string, unknown> | undefined
+    const responseDetail = responseData?.data as Record<string, unknown> | undefined
+    const message = responseDetail?.detail as string | undefined || 'Failed to add project'
+    ElMessage.error(message)
+  } finally {
+    addingFromUrl.value = false
+  }
+}
+
 onMounted(() => {
   store.fetchTags()
   store.fetchProjects()
@@ -141,11 +173,35 @@ onUnmounted(() => {
           <el-option v-for="opt in sortOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
         </el-select>
       </el-col>
-      <el-col :span="12" style="text-align: right; color: #999;">
+      <el-col :span="12" style="text-align: right;">
         <el-button type="primary" size="small" :loading="syncing" @click.stop="handleSync">
           {{ syncing ? 'Syncing...' : 'Sync Now' }}
         </el-button>
-        <span style="margin-left: 8px;">{{ store.projects.length }} projects</span>
+        <span style="margin-left: 8px; color: #999;">{{ store.projects.length }} projects</span>
+      </el-col>
+    </el-row>
+
+    <!-- Manual Add -->
+    <el-row :gutter="16" style="margin-bottom: 16px;">
+      <el-col :span="18">
+        <el-input
+          v-model="githubUrlInput"
+          placeholder="Add project from GitHub URL (e.g., https://github.com/owner/repo)"
+          @keyup.enter="handleAddFromGithubUrl"
+        >
+          <template #append>
+            <el-button
+              type="primary"
+              :loading="addingFromUrl"
+              @click="handleAddFromGithubUrl"
+            >
+              Add
+            </el-button>
+          </template>
+        </el-input>
+      </el-col>
+      <el-col :span="6" style="color: #999; font-size: 12px; padding-top: 8px;">
+        Must be a valid GitHub repository URL
       </el-col>
     </el-row>
 
