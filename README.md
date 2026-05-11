@@ -4,6 +4,9 @@
 
 AI Radar 是面向团队内部的轻量化工具，把"**发现 → 评估 → 认领 → 试用 → 归档 → 沉淀**"这条 AI 开源技术消化链路串成完整闭环，并自动沉淀为可检索、可问答的项目知识图谱。
 
+<img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/e1e193de-24a8-4227-a47e-e81cb6e4e027" />
+
+
 ---
 
 ## 为什么需要 AI Radar
